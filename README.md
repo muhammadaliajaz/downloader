@@ -1,4 +1,4 @@
-# ⚡ ARY Plus & Universal Video Downloader
+# Steller Studio
 
 ![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)
 ![Flask Framework](https://img.shields.io/badge/framework-Flask_3.0-green.svg)
@@ -99,56 +99,6 @@ The downloader engine (`core/downloader.py`) is pre-configured with high-through
 | `ffmpeg_args` | `-threads 0 -preset ultrafast` | Maximize CPU core usage during audio/video conversion |
 
 ---
-
-## 📡 REST API Reference
-
-### 1. Initiate Download Task
-- **Endpoint**: `POST /api/download`
-- **Payload**:
-  ```json
-  {
-    "url": "https://aryplus.tv/video/v2/3/...",
-    "format": "mp4",
-    "quality": "720"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "success": true,
-    "task_id": "a1b2c3d4e5f6"
-  }
-  ```
-
-### 2. Poll Download Progress
-- **Endpoint**: `GET /api/progress/<task_id>`
-- **Response**:
-  ```json
-  {
-    "status": "downloading",
-    "progress": 45.8,
-    "speed": "3.42MiB/s",
-    "eta": "00:32",
-    "downloaded": "142.50MiB",
-    "total_size": "310.00MiB",
-    "title": "Episode 7 - Dar e Nijat",
-    "thumbnail": "https://images.aryplus.tv/..."
-  }
-  ```
-
-### 3. Cancel Active Download
-- **Endpoint**: `POST /api/cancel/<task_id>`
-- **Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Download cancelled"
-  }
-  ```
-
-### 4. Download File
-- **Endpoint**: `GET /download/<filename>`
-- **Response**: File binary download attachment.
 
 ---
 
