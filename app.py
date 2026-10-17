@@ -65,6 +65,10 @@ def get_client_ip():
 def index():
     return render_template('index.html')
 
+@app.route('/preview')
+def preview_ui():
+    return render_template('preview_ui.html')
+
 @app.route('/api/download', methods=['POST'])
 def trigger_download():
     # 1. Rate Limiting Check (Max 10 requests / min per IP)

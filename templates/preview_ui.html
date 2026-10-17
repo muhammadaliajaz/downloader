@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+    <!-- SEO Primary Meta Tags -->
+    <title>VideoMax — Online Video Downloader | ARY Plus &amp; YouTube Engine</title>
+    <meta name="title" content="VideoMax — Online Video Downloader | ARY Plus &amp; YouTube Engine">
+    <meta name="description"
+        content="Free high-speed online video downloader for ARY Plus dramas, ARY Zap, and YouTube. Download 720p HD, 1080p MP4 videos, and 192kbps MP3 audio with 32 parallel CDN streams.">
+    <meta name="keywords"
+        content="online video downloader, ary plus downloader, pakistani drama download, youtube video downloader, ary zap download, video to mp4, download dar e nijat, high speed video downloader">
+    <meta name="author" content="VideoMax MediaVault">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://yourdomain.com/preview">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://yourdomain.com/preview">
+    <meta property="og:title" content="VideoMax — High-Speed Online Video Downloader">
+    <meta property="og:description"
+        content="Download Videos and Audios from VideoMax or other Social Video Streaming Websites into high quality MP3 and MP4.">
+    <meta property="og:site_name" content="VideoMax">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://yourdomain.com/preview">
+    <meta property="twitter:title" content="VideoMax — High-Speed Online Video Downloader">
+    <meta property="twitter:description"
+        content="Download Videos and Audios from VideoMax or other Social Video Streaming Websites into high quality MP3 and MP4.">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='16' fill='%23102421'/><circle cx='16' cy='16' r='10' stroke='%23d6ede4' stroke-width='2' fill='none'/><circle cx='16' cy='16' r='5' fill='%23d6ede4'/></svg>">
+
+    <!-- Schema.org Structured Data -->
+    <script type="application/ld+json">
+    [
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "VideoMax Online Video Downloader",
+        "url": "https://yourdomain.com/preview",
+        "description": "High-performance video and audio downloader for ARY Plus dramas, ARY Zap, YouTube, and popular video platforms.",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "All",
+        "offers": {
+          "@type": "Offer",
+          "price": "0.00",
+          "priceCurrency": "USD"
+        }
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "HowTo",
+        "name": "How to use Video Downloader",
+        "step": [
+          {
+            "@type": "HowToStep",
+            "name": "Find Video",
+            "text": "Find the video or episode you want to download by searching the desired website, then copy its web link."
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Paste Video",
+            "text": "Paste the copied video link into the downloader input box and select your desired format."
+          },
+          {
+            "@type": "HowToStep",
+            "name": "Download Video",
+            "text": "Click on the Download button to transfer the file directly to your device storage."
+          }
+        ]
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is Online Video Downloader?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "It is a web-based utility that extracts high-definition video and audio streams directly from media servers without requiring software installation."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is ARY Plus & YouTube Downloader Safe?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, completely safe. We do not require accounts, passwords, or intrusive extensions, and all stream downloads are encrypted."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Where are the downloaded files stored?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Files are automatically saved to your browser's default 'Downloads' folder on your PC, Mac, Android, or iPhone."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I download audio or MP3?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes! Switch to the 'Audio (MP3)' format tab to extract high-fidelity 192kbps stereo sound."
+            }
+          }
+        ]
+      }
+    ]
+    </script>
+
+    <!-- Font Awesome Glyphs & Stylesheet -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/preview.css') }}">
+</head>
+
+<body>
+
+    <div class="page-canvas">
+
+        <!-- 1. TOP HEADER (Photo 1) -->
+        <header class="top-header">
+            <a href="/preview" class="brand-logo">
+                <div class="brand-icon-box">
+                    <i class="fa-solid fa-play"></i>
+                </div>
+                <div class="brand-title-wrap">
+                    <h1>Stellar Studio</h1>
+                    <span>Online Video Downloader</span>
+                </div>
+            </a>
+
+            <div class="nav-right-items">
+                <div class="lang-pill">
+                    <i class="fa-solid fa-globe" style="font-size: 13px;"></i>
+                    <span>English</span>
+                    <i class="fa-solid fa-chevron-down" style="font-size: 10px; opacity: 0.7;"></i>
+                </div>
+            </div>
+        </header>
+
+        <!-- 2. HERO CURVED CARD (Direct Photo 1 Structure) -->
+        <section class="hero-curved-card" id="downloader">
+
+            <!-- Badge & Wavy Mark -->
+            <div class="hero-badge-tag">
+                <svg class="hero-wavy-icon" viewBox="0 0 40 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M2 12C6 4 10 4 14 12C18 4 22 4 26 12C30 4 34 4 38 12" stroke="currentColor"
+                        stroke-width="2.5" stroke-linecap="round" />
+                </svg>
+                <span>Online Video</span>
+            </div>
+
+            <!-- Main Big Headline -->
+            <h2 class="hero-headline">
+                Down<span class="accent">loader</span>
+            </h2>
+
+            <!-- Subtitle -->
+            <p class="hero-subtext">
+                Dedicated Video Downloading Engine for ARY Plus Dramas, ARY Zap, and YouTube.
+                Extract high quality 720p HD, 1080p MP4 videos, and 192kbps MP3 audio with just one click.
+            </p>
+
+            <!-- White Floating Pill Search Box (Photo 1) -->
+            <div class="search-pill-wrapper">
+                <form id="downloadForm">
+                    <div class="search-pill-bar">
+                        <i class="fa-solid fa-link search-icon-left"></i>
+                        <input type="text" id="videoUrl" class="search-pill-input" required autocomplete="off"
+                            spellcheck="false"
+                            placeholder="Paste a Video or Search Url Here (e.g. aryplus.tv/video/...)" />
+
+                        <button type="submit" id="submitBtn" class="btn-pill-download">
+                            <span>Download</span>
+                            <i class="fa-solid fa-arrow-down"></i>
+                        </button>
+                    </div>
+
+                    <!-- Quick Options (Video/Audio Tabs + Quality Selector) -->
+                    <div class="search-options-row">
+                        <div class="format-segmented-pill">
+                            <button type="button" id="formatBtnVideo" class="format-btn active">Video (MP4)</button>
+                            <button type="button" id="formatBtnAudio" class="format-btn">Audio (MP3)</button>
+                        </div>
+
+                        <select id="qualitySelect" class="quality-select-pill">
+                            <option value="720" selected>720p HD (Recommended • ~300 MB)</option>
+                            <option value="1080">1080p Full HD (~2.5 GB)</option>
+                            <option value="480">480p SD</option>
+                            <option value="360">360p Mobile</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Floating Dark Pill: "Supported Platforms" (Photo 1) -->
+            <div class="supported-platforms-pill">
+                <span>Supported Platforms:</span>
+                <div class="supported-icons-list">
+                    <i class="fa-brands fa-youtube" title="YouTube"></i>
+                    <i class="fa-solid fa-tv" title="ARY Plus & Zap"></i>
+                    <i class="fa-brands fa-facebook" title="Facebook"></i>
+                    <i class="fa-brands fa-instagram" title="Instagram"></i>
+                    <i class="fa-brands fa-tiktok" title="TikTok"></i>
+                    <i class="fa-brands fa-x-twitter" title="X (Twitter)"></i>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Decorative Accent Doodle under Curved Hero -->
+        <div class="hero-bottom-accent">
+            <svg width="48" height="24" viewBox="0 0 48 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 14C12 2 24 22 36 8C40 3 44 14 46 16" stroke="var(--swatch-5)" stroke-width="2"
+                    stroke-linecap="round" />
+            </svg>
+        </div>
+
+        <!-- LIVE TELEMETRY DRAWER (Appears on Download) -->
+        <section id="dashboardCard" class="live-telemetry-panel" style="display: none;">
+            <div class="telemetry-header">
+                <div>
+                    <span class="telemetry-tag">Active Stream Transfer</span>
+                    <h3 id="previewTitle" class="telemetry-title">Connecting to media stream...</h3>
+                    <p id="statusPillText" class="telemetry-status-sub">Negotiating direct CDN handshake via 32
+                        workers...</p>
+                </div>
+                <button type="button" id="cancelBtn" class="btn-cancel-task">
+                    <i class="fa-solid fa-xmark"></i> Cancel
+                </button>
+            </div>
+
+            <div class="progress-track-container">
+                <div class="progress-labels-row">
+                    <span>Fragment Transfer Rate</span>
+                    <span id="progressPercent"
+                        style="font-family: var(--font-mono); font-weight: 700; color: var(--swatch-6);">0%</span>
+                </div>
+                <div class="progress-bar-slot">
+                    <div id="progressBar" class="progress-bar-fill"></div>
+                </div>
+            </div>
+
+            <div class="telemetry-stats-row">
+                <div class="stat-item">
+                    <span>Speed</span>
+                    <span id="metricSpeed">-- MB/s</span>
+                </div>
+                <div class="stat-item">
+                    <span>Transferred</span>
+                    <span id="metricDownloaded">0 MB / -- MB</span>
+                </div>
+                <div class="stat-item">
+                    <span>ETA Remaining</span>
+                    <span id="metricEta">Calculating...</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SUCCESS RESULT CARD -->
+        <section id="successCard" class="success-result-card" style="display: none;">
+            <div class="success-check-icon">
+                <i class="fa-solid fa-check"></i>
+            </div>
+            <h3>Download Complete!</h3>
+            <p id="successFileTitle">Your high-definition media file is ready for download.</p>
+
+            <div class="success-actions">
+                <a id="downloadFinalBtn" href="#" class="btn-save-file">
+                    <i class="fa-solid fa-download"></i>
+                    <span>Save to Device</span>
+                </a>
+                <button type="button" id="resetDownloadBtn" class="btn-reset">
+                    Download Another
+                </button>
+            </div>
+        </section>
+
+        <!-- ERROR CARD -->
+        <section id="errorCard" class="error-notice-card" style="display: none;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <strong style="font-weight: 700;">Stream Notice</strong>
+            </div>
+            <div id="errorMessage"></div>
+        </section>
+
+        <!-- 3. SECONDARY PROMO SECTION (Photo 1) -->
+        <section class="secondary-promo-section">
+            <div class="promo-title-badge-row">
+                <span class="promo-tag-outline">Free</span>
+                <span class="promo-badge-pill">ARY Plus &amp; YouTube</span>
+            </div>
+            <h2 class="promo-main-heading">Video Downloader</h2>
+            <p class="promo-subtext">
+                With this platform, you can easily download any Pakistani drama episode or YouTube video with zero speed
+                limits.
+            </p>
+            <a href="#how-to" class="btn-learn-more">
+                <span>Learn More</span>
+                <i class="fa-solid fa-chevron-right" style="font-size: 11px;"></i>
+            </a>
+        </section>
+
+        <!-- 4. HOW TO USE SECTION (Split: Character Graphic + 01, 02, 03 Steps from Photo 1) -->
+        <section class="how-to-section" id="how-to">
+            <div class="section-header-centered">
+                <span class="section-label-light">How to use</span>
+                <h2 class="section-title-large">
+                    <span class="highlight">Video</span> Downloader
+                </h2>
+            </div>
+
+            <div class="how-to-grid">
+                <!-- Left: Cutout character graphic on shaped container (Photo 1) -->
+                <div class="character-showcase-box">
+                    <div class="character-backdrop-blob"></div>
+                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80"
+                        alt="Smiling user holding phone" class="character-img-cutout" />
+                </div>
+
+                <!-- Right: Circular Numbered Steps (Photo 1) -->
+                <div class="how-steps-stack">
+                    <!-- Step 01 -->
+                    <div class="how-step-item">
+                        <div class="step-circle-badge">01</div>
+                        <div class="how-step-content">
+                            <h3>Find Video</h3>
+                            <p>Find the video or ARY drama episode you want to download from your browser, then copy its
+                                web link.</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 02 (Highlighted pill badge in Photo 1) -->
+                    <div class="how-step-item">
+                        <div class="step-circle-badge highlighted">02</div>
+                        <div class="how-step-content">
+                            <h3>Paste Video</h3>
+                            <p>Paste the copied video link into the downloader search box and choose your desired
+                                quality format.</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 03 -->
+                    <div class="how-step-item">
+                        <div class="step-circle-badge">03</div>
+                        <div class="how-step-content">
+                            <h3>Download Video</h3>
+                            <p>Click on the Download button to extract the stream. Once complete, click Save to Device
+                                to store it locally.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. THREE LARGE HORIZONTAL DARK STEP CARDS (01, 02, 03 from Photo 1) -->
+        <section class="horizontal-cards-grid">
+            <div class="dark-step-card">
+                <span class="card-huge-number">01</span>
+                <p>With this platform, you can easily download any video from ARY Plus and YouTube completely free of
+                    charge.</p>
+            </div>
+
+            <div class="dark-step-card">
+                <span class="card-huge-number">02</span>
+                <p>Select between 720p crisp high-definition video or extract pure audio directly into high-fidelity
+                    192kbps MP3.</p>
+            </div>
+
+            <div class="dark-step-card">
+                <span class="card-huge-number">03</span>
+                <p>High-speed multi-fragment stream engine downloads 32 chunks simultaneously with instant direct CDN
+                    delivery.</p>
+            </div>
+        </section>
+
+        <!-- 6. WHY TO CHOOSE SECTION (4-Column Circular Features from Photo 1) -->
+        <section class="why-choose-section">
+            <div class="section-header-centered">
+                <span class="section-label-light">Why To Choose</span>
+                <h2 class="section-title-large">
+                    <span class="highlight">VideoMax</span> Downloader
+                </h2>
+            </div>
+
+            <div class="features-four-grid">
+                <!-- Col 1 -->
+                <div class="feature-col-item">
+                    <div class="feature-circular-icon">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <h3>High Quality</h3>
+                    <p>Get the highest available resolution without losing clarity. Preserves full 720p HD and 1080p
+                        master video tracks.</p>
+                </div>
+
+                <!-- Col 2 -->
+                <div class="feature-col-item">
+                    <div class="feature-circular-icon">
+                        <i class="fa-solid fa-stopwatch"></i>
+                    </div>
+                    <h3>Fast Downloading</h3>
+                    <p>Powered by 32 parallel chunk workers streaming directly from CDN origin servers with zero
+                        buffering delay.</p>
+                </div>
+
+                <!-- Col 3 -->
+                <div class="feature-col-item">
+                    <div class="feature-circular-icon">
+                        <i class="fa-solid fa-infinity"></i>
+                    </div>
+                    <h3>Unlimited Download</h3>
+                    <p>Download as many drama episodes and videos as you want. No registration required and no arbitrary
+                        limits.</p>
+                </div>
+
+                <!-- Col 4 -->
+                <div class="feature-col-item">
+                    <div class="feature-circular-icon">
+                        <i class="fa-solid fa-mobile-screen"></i>
+                    </div>
+                    <h3>Support All Devices</h3>
+                    <p>Web-based compatibility across all desktop and mobile browsers including Windows, macOS, Android,
+                        and iOS.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 7. CURATED ARY PLUS DRAMAS (1-Click Test Queue) -->
+        <section class="drama-queue-section">
+            <div class="section-header-centered">
+                <span class="section-label-light">Instant Queue</span>
+                <h2 class="section-title-large">
+                    <span class="highlight">Featured</span> ARY Plus Dramas
+                </h2>
+            </div>
+
+            <div class="queue-grid">
+                <div class="drama-card"
+                    onclick="fillAndFocus('https://aryplus.tv/video/v2/3/6a89bcc6c0a797111795ce0a/6a57868b5bf57c474cc00a50', '720')">
+                    <div>
+                        <div class="drama-tag">EPISODE 07 • ARY PLUS</div>
+                        <h3>Dar e Nijat</h3>
+                        <p>Complete episode master stream with crystal clear audio sync. Ready for 720p HD transfer.</p>
+                    </div>
+                    <span class="drama-action-link">Download 720p <i class="fa-solid fa-arrow-right"></i></span>
+                </div>
+
+                <div class="drama-card"
+                    onclick="fillAndFocus('https://aryplus.tv/video/v2/3/6a91aa81c0a79711171fc1b8/6a57868b5bf57c474cc00a50', '720')">
+                    <div>
+                        <div class="drama-tag">EPISODE 08 • ARY PLUS</div>
+                        <h3>Dar e Nijat</h3>
+                        <p>Original high-definition drama stream directly captured from vod.aryzap.com CDN.</p>
+                    </div>
+                    <span class="drama-action-link">Download 720p <i class="fa-solid fa-arrow-right"></i></span>
+                </div>
+
+                <div class="drama-card"
+                    onclick="fillAndFocus('https://aryplus.tv/video/v2/3/6a82708bc0a7971117562f74/6a57868b5bf57c474cc00a50', '720')">
+                    <div>
+                        <div class="drama-tag">EPISODE 15 • ARY DIGITAL</div>
+                        <h3>Hasrat</h3>
+                        <p>Trending broadcast episode with 32 multi-threaded chunk negotiation for rapid download.</p>
+                    </div>
+                    <span class="drama-action-link">Download 720p <i class="fa-solid fa-arrow-right"></i></span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 8. ORGANIC CURVED FAQ SECTION (Direct Photo 1 Design) -->
+        <section class="faq-outer-wrap" id="faq">
+            <div class="faq-organic-card">
+                <!-- Abstract contour lines in top right -->
+                <div class="faq-contour-lines"></div>
+
+                <!-- Top Badge Row -->
+                <div class="faq-top-badge-row">
+                    <h2>
+                        <span>Frequently</span>
+                        <span class="faq-pill-badge">Asked Questions</span>
+                    </h2>
+                </div>
+
+                <!-- FAQ Accordion List -->
+                <div class="faq-accordion-list">
+                    <!-- Item 1 -->
+                    <div class="faq-row active">
+                        <button type="button" class="faq-trigger-btn">
+                            <span>01. What Is Online Video Downloader?</span>
+                            <i class="fa-solid fa-chevron-down faq-chevron"></i>
+                        </button>
+                        <div class="faq-answer-panel">
+                            <div class="faq-answer-inner">
+                                <p>VideoMax is a high-speed web utility that allows you to download videos and audio
+                                    from ARY Plus, ARY Zap, and YouTube directly to your device without installing
+                                    third-party apps or software.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item 2 -->
+                    <div class="faq-row">
+                        <button type="button" class="faq-trigger-btn">
+                            <span>02. Is ARY Plus &amp; YouTube Downloader Safe?</span>
+                            <i class="fa-solid fa-chevron-down faq-chevron"></i>
+                        </button>
+                        <div class="faq-answer-panel">
+                            <div class="faq-answer-inner">
+                                <p>Yes, 100% safe. We never ask for account credentials, passwords, or personal details.
+                                    The stream is fetched directly from origin CDN servers over secure SSL connections.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item 3 -->
+                    <div class="faq-row">
+                        <button type="button" class="faq-trigger-btn">
+                            <span>03. Where Are The Downloaded Files Stored?</span>
+                            <i class="fa-solid fa-chevron-down faq-chevron"></i>
+                        </button>
+                        <div class="faq-answer-panel">
+                            <div class="faq-answer-inner">
+                                <p>Downloaded files are placed automatically into your operating system's standard
+                                    'Downloads' directory on your PC, Mac, Android, or iOS device.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item 4 -->
+                    <div class="faq-row">
+                        <button type="button" class="faq-trigger-btn">
+                            <span>04. Can I Download Audio Or MP3?</span>
+                            <i class="fa-solid fa-chevron-down faq-chevron"></i>
+                        </button>
+                        <div class="faq-answer-panel">
+                            <div class="faq-answer-inner">
+                                <p>Yes! Simply switch the format toggle next to the search input from 'Video (MP4)' to
+                                    'Audio (MP3)' to download crisp 192kbps stereo sound.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 9. FOOTER (Photo 1) -->
+        <footer class="site-footer">
+            <div class="footer-inner">
+                <div class="footer-brand">
+                    <div class="brand-icon-box" style="width: 30px; height: 30px; font-size: 14px;">
+                        <i class="fa-solid fa-play"></i>
+                    </div>
+                    <span style="font-family: var(--font-display); font-weight: 800; font-size: 16px;">VideoMax</span>
+                </div>
+
+                <div class="footer-nav-links">
+                    <a href="#downloader">Downloader</a>
+                    <a href="#how-to">How To Use</a>
+                    <a href="#faq">FAQ</a>
+                    <a href="#privacy">Privacy Policy</a>
+                    <a href="#terms">Terms of Service</a>
+                </div>
+
+                <div class="footer-copy">
+                    &copy; 2026 VideoMax MediaVault. All Rights Reserved.
+                </div>
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- Frontend Script Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('downloadForm');
+            const urlInput = document.getElementById('videoUrl');
+            const submitBtn = document.getElementById('submitBtn');
+            const formatBtnVideo = document.getElementById('formatBtnVideo');
+            const formatBtnAudio = document.getElementById('formatBtnAudio');
+            const qualitySelect = document.getElementById('qualitySelect');
+
+            const dashboardCard = document.getElementById('dashboardCard');
+            const previewTitle = document.getElementById('previewTitle');
+            const statusPillText = document.getElementById('statusPillText');
+            const progressBar = document.getElementById('progressBar');
+            const progressPercent = document.getElementById('progressPercent');
+            const metricSpeed = document.getElementById('metricSpeed');
+            const metricDownloaded = document.getElementById('metricDownloaded');
+            const metricEta = document.getElementById('metricEta');
+            const cancelBtn = document.getElementById('cancelBtn');
+
+            const successCard = document.getElementById('successCard');
+            const downloadFinalBtn = document.getElementById('downloadFinalBtn');
+            const resetDownloadBtn = document.getElementById('resetDownloadBtn');
+            const errorCard = document.getElementById('errorCard');
+            const errorMessage = document.getElementById('errorMessage');
+
+            let selectedFormat = 'mp4';
+            let activeTaskId = null;
+            let currentEventSource = null;
+            const originalBtnHtml = submitBtn.innerHTML;
+
+            // Format toggles
+            formatBtnVideo.addEventListener('click', () => {
+                selectedFormat = 'mp4';
+                formatBtnVideo.classList.add('active');
+                formatBtnAudio.classList.remove('active');
+                qualitySelect.disabled = false;
+                qualitySelect.style.opacity = '1';
+                qualitySelect.innerHTML = `
+                    <option value="720" selected>720p HD (Recommended • ~300 MB)</option>
+                    <option value="1080">1080p Full HD (~2.5 GB)</option>
+                    <option value="480">480p SD</option>
+                    <option value="360">360p Mobile</option>
+                `;
+            });
+
+            formatBtnAudio.addEventListener('click', () => {
+                selectedFormat = 'mp3';
+                formatBtnAudio.classList.add('active');
+                formatBtnVideo.classList.remove('active');
+                qualitySelect.disabled = true;
+                qualitySelect.style.opacity = '0.5';
+                qualitySelect.innerHTML = `<option value="best" selected>MP3 (192 kbps Stereo)</option>`;
+            });
+
+            // Quick Fill from Drama cards
+            window.fillAndFocus = function (url, quality = '720') {
+                urlInput.value = url;
+                if (selectedFormat === 'mp4') {
+                    qualitySelect.value = quality;
+                }
+                const heroSection = document.getElementById('downloader');
+                heroSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                urlInput.focus();
+            };
+
+            // Form Submit
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const url = urlInput.value.trim();
+                if (!url) return;
+
+                errorCard.style.display = 'none';
+                successCard.style.display = 'none';
+                dashboardCard.style.display = 'block';
+                dashboardCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = `<span>Connecting...</span> <i class="fa-solid fa-spinner fa-spin"></i>`;
+
+                progressBar.style.width = '3%';
+                progressPercent.textContent = '0%';
+                metricSpeed.textContent = '-- MB/s';
+                metricDownloaded.textContent = '0 MB / -- MB';
+                metricEta.textContent = 'Negotiating';
+                previewTitle.textContent = 'Extracting media streams...';
+                statusPillText.textContent = 'Connecting to CDN stream...';
+
+                try {
+                    const res = await fetch('/api/download', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            url,
+                            format: selectedFormat,
+                            quality: qualitySelect.value || '720'
+                        })
+                    });
+
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Server rejected download request.');
+
+                    activeTaskId = data.task_id;
+                    listenToProgress(activeTaskId);
+
+                } catch (err) {
+                    showError(err.message);
+                }
+            });
+
+            function listenToProgress(taskId) {
+                if (currentEventSource) currentEventSource.close();
+                currentEventSource = new EventSource(`/api/status/${taskId}`);
+
+                currentEventSource.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.title && previewTitle.textContent !== data.title) {
+                            previewTitle.textContent = data.title;
+                        }
+
+                        if (data.status === 'processing') {
+                            statusPillText.textContent = 'Connecting to Stream...';
+                        } else if (data.status === 'downloading') {
+                            const percent = Math.min(Math.max(data.progress || 0, 0), 100);
+                            progressBar.style.width = `${percent}%`;
+                            progressPercent.textContent = `${percent.toFixed(0)}%`;
+                            statusPillText.textContent = 'Downloading (32 Parallel CDN Streams)';
+                            metricSpeed.textContent = data.speed || '-- MB/s';
+                            metricDownloaded.textContent = `${data.downloaded || '0 MB'} / ${data.total_size || 'N/A'}`;
+                            metricEta.textContent = data.eta ? `${data.eta} left` : 'Calculating...';
+                        } else if (data.status === 'converting') {
+                            progressBar.style.width = '100%';
+                            progressPercent.textContent = '100%';
+                            statusPillText.textContent = 'Finalizing file stream...';
+                        } else if (data.status === 'finished') {
+                            currentEventSource.close();
+                            handleComplete(taskId, data);
+                        } else if (data.status === 'error') {
+                            currentEventSource.close();
+                            showError(data.error || 'Download failed.');
+                        } else if (data.status === 'cancelled') {
+                            currentEventSource.close();
+                            dashboardCard.style.display = 'none';
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = originalBtnHtml;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing SSE', e);
+                    }
+                };
+
+                currentEventSource.onerror = () => {
+                    currentEventSource.close();
+                    showError('Connection to server interrupted.');
+                };
+            }
+
+            function handleComplete(taskId, data) {
+                dashboardCard.style.display = 'none';
+                successCard.style.display = 'block';
+                successCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                downloadFinalBtn.href = `/api/files/${taskId}`;
+                if (data.title) {
+                    document.getElementById('successFileTitle').textContent = data.title;
+                }
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
+            }
+
+            function showError(msg) {
+                dashboardCard.style.display = 'none';
+                successCard.style.display = 'none';
+                errorCard.style.display = 'block';
+                errorMessage.innerHTML = msg;
+                errorCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
+            }
+
+            cancelBtn.addEventListener('click', async () => {
+                if (!activeTaskId) return;
+                try {
+                    await fetch(`/api/cancel/${activeTaskId}`, { method: 'POST' });
+                } catch (e) { }
+                if (currentEventSource) currentEventSource.close();
+                dashboardCard.style.display = 'none';
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
+            });
+
+            resetDownloadBtn.addEventListener('click', () => {
+                successCard.style.display = 'none';
+                urlInput.value = '';
+                urlInput.focus();
+            });
+
+            // Accordion FAQ Toggle
+            document.querySelectorAll('.faq-trigger-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const row = btn.closest('.faq-row');
+                    const isActive = row.classList.contains('active');
+
+                    document.querySelectorAll('.faq-row').forEach(r => r.classList.remove('active'));
+
+                    if (!isActive) {
+                        row.classList.add('active');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+
+</html>
