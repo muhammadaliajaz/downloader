@@ -6,7 +6,8 @@ import re
 import time
 
 from core.ary_extractor import extract_ary_stream_sync
-from core.security import release_concurrency_slot
+from core.tiktok_extractor import extract_tiktok_stream, is_tiktok_url, normalize_tiktok_url
+from core.security import release_concurrency_slot, is_safe_filepath
 
 PROGRESS_CACHE = {}
 CANCEL_EVENTS = {}
@@ -78,6 +79,33 @@ def download_task(task_id, url, format_type, quality, download_dir):
         except Exception as e:
             print("ARY Extractor fallback notice:", e)
 
+    # TikTok Direct Stream Extractor (Watermark-free, zero bot block)
+    tiktok_title = None
+    tiktok_thumbnail = None
+    is_tiktok = is_tiktok_url(url)
+    
+    if is_tiktok:
+        try:
+            with CACHE_LOCK:
+                if task_id in PROGRESS_CACHE:
+                    PROGRESS_CACHE[task_id]['title'] = "Connecting to TikTok high-speed CDN..."
+            
+            tiktok_info = extract_tiktok_stream(url, format_type)
+            if tiktok_info and tiktok_info.get('stream_url'):
+                target_url = tiktok_info['stream_url']
+                tiktok_title = tiktok_info.get('title')
+                tiktok_thumbnail = tiktok_info.get('thumbnail')
+                with CACHE_LOCK:
+                    if task_id in PROGRESS_CACHE:
+                        PROGRESS_CACHE[task_id].update({
+                            'title': tiktok_title or "TikTok Video",
+                            'thumbnail': tiktok_thumbnail
+                        })
+            else:
+                target_url = normalize_tiktok_url(url)
+        except Exception as e:
+            print("TikTok Extractor fallback notice:", e)
+
     if not target_url.startswith('http://') and not target_url.startswith('https://'):
         target_url = f"ytsearch1:{url}"
 
@@ -85,6 +113,13 @@ def download_task(task_id, url, format_type, quality, download_dir):
         # Check for cancellation
         if cancel_event.is_set():
             raise CancelledError("User requested cancellation")
+
+        # DoS Defense: Abort downloads exceeding 2 GB to protect server disk space
+        MAX_ALLOWED_BYTES = 2 * 1024 * 1024 * 1024 # 2 GB
+        dl_bytes = d.get('downloaded_bytes') or 0
+        tot_bytes = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
+        if dl_bytes > MAX_ALLOWED_BYTES or tot_bytes > MAX_ALLOWED_BYTES:
+            raise CancelledError("Download exceeded the maximum allowed size limit of 2 GB.")
 
         ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
         
@@ -140,46 +175,76 @@ def download_task(task_id, url, format_type, quality, download_dir):
     if ffmpeg_path:
         os.environ['FFMPEG_BINARY'] = ffmpeg_path
 
+    # Detect Node.js runtime for YouTube challenge solving
+    def get_node_path():
+        path = shutil.which('node')
+        if path:
+            return path
+        common = [
+            r"C:\Program Files\nodejs\node.exe",
+            r"C:\Program Files (x86)\nodejs\node.exe"
+        ]
+        for p in common:
+            if os.path.isfile(p):
+                return p
+        return None
+
+    node_path = get_node_path()
+
+    is_ary = any(domain in url.lower() for domain in ['aryplus.tv', 'aryzap.com', 'vod.aryzap.com'])
+
     ydl_opts = {
         'outtmpl': os.path.join(download_dir, f'{task_id}_%(title)s.%(ext)s'),
         'progress_hooks': [my_hook],
         'quiet': True,
         'no_warnings': True,
         'noplaylist': True,
-        'cachedir': False,                    # Skip disk cache lookup for speed
-        'youtube_include_dash_manifest': False, # Skip extra manifest queries
+        'cachedir': False,
+        'youtube_include_dash_manifest': False,
         'youtube_include_hls_manifest': False,
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['ios', 'android', 'web']
-            }
-        },
-        # ULTRA-FAST SPEED OPTIMIZATIONS
-        'concurrent_fragments': 32,           # 32 Multi-Threaded Concurrent Streams
-        'buffersize': 4194304,                # 4 MB Memory Buffer
-        'http_chunk_size': 10485760,          # 10 MB Chunk Transfers
-        'hls_use_mpegts': True,               # Ultra fast HLS stream processing
-        'hls_prefer_native': True,            # Multi-fragment native HLS downloader
-        'retries': 3,                         # Fast retries
-        'fragment_retries': 3,                # Fast fragment retries
-        'skip_unavailable_fragments': True,   # Skip broken fragments immediately
-        'keep_fragments': False,              # Clean up temporary fragments instantly
-        'file_access_retries': 2,             # Fast file access retries
-        'extractor_retries': 2,               # Fast extractor retries
-        'socket_timeout': 10,                 # 10 sec socket timeout for instant failover
-        'nocheckcertificate': True,           # Skip SSL cert verification overhead
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Referer': 'https://aryplus.tv/',
-            'Origin': 'https://aryplus.tv'
-        },
+        'retries': 5,
+        'fragment_retries': 5,
+        'skip_unavailable_fragments': True,
+        'keep_fragments': False,
+        'file_access_retries': 3,
+        'extractor_retries': 3,
+        'socket_timeout': 15,
+        'nocheckcertificate': True,
         'postprocessor_args': {
             'ffmpeg': ['-threads', '0', '-preset', 'ultrafast']
         }
     }
-    
+
     if ffmpeg_path:
         ydl_opts['ffmpeg_location'] = ffmpeg_path
+
+    if node_path:
+        ydl_opts['js_runtimes'] = {'node': {'path': node_path}}
+        ydl_opts['remote_components'] = ['ejs:github']
+
+    if is_ary:
+        ydl_opts['http_headers'] = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://aryplus.tv/',
+            'Origin': 'https://aryplus.tv'
+        }
+        # 8 concurrent fragments gives max CDN throughput without socket drops
+        ydl_opts['concurrent_fragments'] = 8
+        ydl_opts['buffersize'] = 2097152
+        ydl_opts['hls_prefer_native'] = True
+    elif is_tiktok:
+        ydl_opts['http_headers'] = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://www.tiktok.com/',
+        }
+        ydl_opts['concurrent_fragments'] = 4
+    else:
+        ydl_opts['concurrent_fragments'] = 6
+        ydl_opts['extractor_args'] = {
+            'youtube': {
+                'player_client': ['web', 'ios', 'android']
+            }
+        }
 
     if format_type == 'mp3':
         ydl_opts.update({
@@ -192,20 +257,13 @@ def download_task(task_id, url, format_type, quality, download_dir):
         })
     else:
         if quality == 'best':
-            # Best available quality
-            ydl_opts.update({
-                'format': 'best[ext=mp4]/best/bestvideo+bestaudio',
-            })
+            ydl_opts['format'] = 'bestvideo+bestaudio/best'
         elif quality.isdigit():
-            # Specific height quality (e.g. 720p) - optimized for both HLS streams and standard mp4
             height = quality
-            ydl_opts.update({
-                'format': f'best[height<={height}][ext=mp4]/best[height<={height}]/bestvideo[height<={height}]+bestaudio/best',
-            })
+            # Direct resolution match for both HLS sub-playlists and standard videos
+            ydl_opts['format'] = f'bestvideo[height<={height}]+bestaudio/best[height<={height}]/best'
         else:
-            ydl_opts.update({
-                'format': 'best[height<=720]/best[ext=mp4]/best',
-            })
+            ydl_opts['format'] = 'bestvideo[height<=720]+bestaudio/best[height<=720]/best'
         
     try:
         # Store metadata as soon as we get it
@@ -245,13 +303,22 @@ def download_task(task_id, url, format_type, quality, download_dir):
                 info_target = info
             
             # Use captured metadata or fallback to info target
-            title = ary_title or metadata.get('title') or info_target.get('title', 'ARY Plus Video')
-            thumbnail = ary_thumbnail or metadata.get('thumbnail') or info_target.get('thumbnail')
+            title = ary_title or tiktok_title or metadata.get('title') or info_target.get('title', 'Video')
+            thumbnail = ary_thumbnail or tiktok_thumbnail or metadata.get('thumbnail') or info_target.get('thumbnail')
             
             expected_filename = ydl.prepare_filename(info_target)
             if format_type == 'mp3':
                 expected_filename = os.path.splitext(expected_filename)[0] + '.mp3'
             
+            # Security: Path Traversal Defense
+            if not is_safe_filepath(expected_filename, download_dir):
+                if os.path.exists(expected_filename):
+                    try:
+                        os.remove(expected_filename)
+                    except Exception:
+                        pass
+                raise Exception("Target path traversal blocked.")
+
             # Security: Validate file extension against allowed media extensions
             allowed_exts = ['.mp4', '.mp3', '.m4a', '.webm', '.mkv', '.avi', '.mov', '.flv']
             _, ext = os.path.splitext(expected_filename)

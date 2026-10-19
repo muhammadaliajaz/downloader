@@ -1,6 +1,6 @@
 @echo off
 echo ===================================================
-echo   ARY Plus Downloader - Initial Setup
+echo   Stellar Video Downloader - Initial Setup
 echo ===================================================
 
 echo [1/3] Creating Virtual Environment...

@@ -6,12 +6,18 @@
 
 :root {
   /* PHOTO 2 PALETTE — 6 Swatches Stack */
-  --swatch-1: #091412; /* Deepest canvas background */
-  --swatch-2: #102421; /* Dark pine card & elevated surface */
-  --swatch-3: #18332f; /* Medium pine container */
-  --swatch-4: #2b5349; /* Forest divider & border */
-  --swatch-5: #7ba397; /* Soft sage mint muted text & icons */
-  --swatch-6: #d6ede4; /* Light frosted mint pills & primary action */
+  --swatch-1: #091412;
+  /* Deepest canvas background */
+  --swatch-2: #102421;
+  /* Dark pine card & elevated surface */
+  --swatch-3: #18332f;
+  /* Medium pine container */
+  --swatch-4: #2b5349;
+  /* Forest divider & border */
+  --swatch-5: #7ba397;
+  /* Soft sage mint muted text & icons */
+  --swatch-6: #d6ede4;
+  /* Light frosted mint pills & primary action */
 
   --text-primary: #f5fbf8;
   --text-muted: #82a89d;
@@ -26,7 +32,9 @@
 }
 
 /* Base Reset */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -109,26 +117,6 @@ body {
   gap: 16px;
 }
 
-.lang-pill {
-  background: var(--swatch-2);
-  border: 1px solid var(--swatch-4);
-  padding: 6px 14px;
-  border-radius: 9999px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--swatch-6);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.lang-pill:hover {
-  background: var(--swatch-3);
-  border-color: var(--swatch-5);
-}
-
 .live-badge-pill {
   display: inline-flex;
   align-items: center;
@@ -154,8 +142,17 @@ body {
 }
 
 @keyframes pulse-live {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
 }
 
 /* ==========================================================================
@@ -180,7 +177,7 @@ body {
   left: 0;
   right: 0;
   height: 100%;
-  background-image: 
+  background-image:
     linear-gradient(180deg, rgba(9, 20, 18, 0.75) 0%, rgba(9, 20, 18, 0.92) 80%, #091412 100%),
     url('https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1600&q=80');
   background-size: cover;
@@ -763,7 +760,7 @@ body {
   right: 0;
   width: 280px;
   height: 280px;
-  background-image: 
+  background-image:
     radial-gradient(circle at top right, transparent 40px, rgba(130, 168, 157, 0.15) 41px, transparent 42px),
     radial-gradient(circle at top right, transparent 80px, rgba(130, 168, 157, 0.15) 81px, transparent 82px),
     radial-gradient(circle at top right, transparent 120px, rgba(130, 168, 157, 0.15) 121px, transparent 122px),
@@ -862,8 +859,111 @@ body {
 }
 
 /* ==========================================================================
-   8. CURATED ARY PLUS DRAMA QUEUE
+   8. UNIVERSAL PLATFORM SPECIFICATIONS & FORMATS
    ========================================================================== */
+.platforms-spec-section {
+  margin: 30px 0 70px;
+}
+
+.platforms-spec-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-top: 28px;
+}
+
+@media (max-width: 860px) {
+  .platforms-spec-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .platforms-spec-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.platform-spec-card {
+  background: var(--swatch-2);
+  border: 1px solid var(--swatch-3);
+  border-radius: 22px;
+  padding: 24px;
+  transition: all 0.25s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.platform-spec-card:hover {
+  background: var(--swatch-3);
+  border-color: var(--swatch-5);
+  transform: translateY(-3px);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35);
+}
+
+.platform-card-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.platform-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(130, 168, 157, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--swatch-6);
+  font-size: 19px;
+  flex-shrink: 0;
+}
+
+.platform-card-title h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--text-primary);
+}
+
+.platform-card-title span {
+  font-size: 11px;
+  color: var(--swatch-5);
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.platform-spec-card p {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.platform-features-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.platform-spec-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--swatch-6);
+  background: var(--swatch-1);
+  border: 1px solid var(--swatch-4);
+  padding: 3px 10px;
+  border-radius: 9999px;
+}
+
+/* Legacy Drama Queue Section */
 .drama-queue-section {
   margin: 20px 0 70px;
 }

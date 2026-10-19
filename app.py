@@ -3,7 +3,9 @@ import uuid
 import time
 import json
 import threading
-from flask import Flask, render_template, request, jsonify, Response, send_file
+import urllib.parse
+import ipaddress
+from flask import Flask, render_template, request, jsonify, Response, send_file, redirect, url_for
 
 from core.downloader import start_download_thread, get_progress, cancel_download
 from core.cleanup import start_cleanup_scheduler
@@ -16,23 +18,27 @@ from core.security import (
 )
 
 app = Flask(__name__)
-app.secret_key = os.urandom(32) # Secure 256-bit random key for session safety
-app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024 # 1 MB Max payload size limit to prevent memory buffer DoS
+app.secret_key = os.urandom(32) # Secure 256-bit cryptographically strong key
+app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024 # 1 MB Max payload limit to prevent DoS
 
 DOWNLOADS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'downloads'))
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 
-# Start background cleanup scheduler for temporary files
+# Start background cleanup scheduler for temporary files (every 10 minutes)
 start_cleanup_scheduler(DOWNLOADS_DIR)
 
 # Custom Security Error Handlers (Prevents Framework Information Disclosure)
+@app.errorhandler(400)
+def handle_400(e):
+    return jsonify({'error': 'Bad request'}), 400
+
+@app.errorhandler(403)
+def handle_403(e):
+    return jsonify({'error': 'Access denied'}), 403
+
 @app.errorhandler(404)
 def handle_404(e):
     return jsonify({'error': 'Resource not found'}), 404
-
-@app.errorhandler(500)
-def handle_500(e):
-    return jsonify({'error': 'Internal server error occurred'}), 500
 
 @app.errorhandler(413)
 def handle_413(e):
@@ -42,24 +48,65 @@ def handle_413(e):
 def handle_429(e):
     return jsonify({'error': 'Too many requests. Please slow down.'}), 429
 
-# Global Security Response Headers Middleware
+@app.errorhandler(500)
+def handle_500(e):
+    return jsonify({'error': 'Internal server error occurred'}), 500
+
+# CSRF & Cross-Origin POST Attack Protection Middleware
+@app.before_request
+def csrf_cross_origin_guard():
+    if request.method in ['POST', 'PUT', 'DELETE', 'PATCH']:
+        origin = request.headers.get('Origin')
+        referer = request.headers.get('Referer')
+        host = request.headers.get('Host')
+        
+        # Verify Origin if supplied
+        if origin:
+            try:
+                origin_host = urllib.parse.urlparse(origin).netloc
+                if origin_host and host and origin_host.lower() != host.lower():
+                    return jsonify({'error': 'Cross-Origin forbidden: Request Origin does not match Host'}), 403
+            except Exception:
+                return jsonify({'error': 'Malformed Origin header'}), 403
+        elif referer:
+            try:
+                referer_host = urllib.parse.urlparse(referer).netloc
+                if referer_host and host and referer_host.lower() != host.lower():
+                    return jsonify({'error': 'Cross-Origin forbidden: Referer does not match Host'}), 403
+            except Exception:
+                return jsonify({'error': 'Malformed Referer header'}), 403
+
+# Global Security Response Headers Middleware (OWASP Secure Headers)
 @app.after_request
 def apply_security_headers(response):
-    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=(), payment=()'
+    response.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
     response.headers['Content-Security-Policy'] = (
-        "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval'; "
-        "frame-ancestors 'self';"
+        "default-src 'self' https: data: 'unsafe-inline'; "
+        "frame-ancestors 'none';"
     )
+    # Mask server header banner to prevent software fingerprinting
+    response.headers['Server'] = 'Protected'
     return response
 
 def get_client_ip():
-    """Extracts client IP address safely accounting for reverse proxies."""
-    if request.headers.get('X-Forwarded-For'):
-        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
-    return request.remote_addr or '127.0.0.1'
+    """Extracts client IP safely without trusting unverified spoofed headers."""
+    remote_ip = request.remote_addr or '127.0.0.1'
+    # Only trust X-Forwarded-For if explicitly configured behind a trusted reverse proxy
+    if os.environ.get('TRUST_PROXY', 'false').lower() == 'true':
+        xff = request.headers.get('X-Forwarded-For')
+        if xff:
+            first_ip = xff.split(',')[0].strip()
+            try:
+                ipaddress.ip_address(first_ip)
+                return first_ip
+            except ValueError:
+                pass
+    return remote_ip
 
 @app.route('/')
 def index():
@@ -67,7 +114,7 @@ def index():
 
 @app.route('/preview')
 def preview_ui():
-    return render_template('preview_ui.html')
+    return redirect(url_for('index'))
 
 @app.route('/api/download', methods=['POST'])
 def trigger_download():
@@ -84,9 +131,15 @@ def trigger_download():
     if not data or not isinstance(data, dict):
         return jsonify({'error': 'Invalid JSON request payload'}), 400
 
-    url = data.get('url')
+    url = (data.get('url') or '').strip()
     format_type = str(data.get('format', 'mp4')).lower().strip()
     quality = str(data.get('quality', '720')).lower().strip()
+
+    # Pre-normalize raw TikTok numeric IDs or short links
+    if url.isdigit() and len(url) >= 15:
+        url = f"https://www.tiktok.com/@user/video/{url}"
+    elif url.startswith(('tiktok.com/', 'www.tiktok.com/', 'vm.tiktok.com/', 'vt.tiktok.com/')):
+        url = f"https://{url}"
 
     # 3. URL Security & SSRF Validation
     is_valid_url, error_msg = validate_url(url)
@@ -172,16 +225,14 @@ def download_file(task_id):
     if not file_path or not is_safe_filepath(file_path, DOWNLOADS_DIR) or not os.path.isfile(file_path):
         return jsonify({'error': 'Access Denied: Invalid or restricted file path'}), 403
 
-    # Background auto-delete after browser retrieval attempt
+    # Background auto-delete after 3 minutes grace period to free disk space
     def secure_delete():
-        for _ in range(180): # Try every second for up to 3 minutes
-            time.sleep(1)
-            try:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                break
-            except Exception:
-                pass
+        time.sleep(180)
+        try:
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+        except Exception:
+            pass
                 
     threading.Thread(target=secure_delete, daemon=True).start()
     
@@ -189,4 +240,5 @@ def download_file(task_id):
 
 if __name__ == '__main__':
     # Production security: debug mode disabled
-    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)

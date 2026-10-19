@@ -329,8 +329,8 @@
                 <!-- Left: Cutout character graphic on shaped container (Photo 1) -->
                 <div class="character-showcase-box">
                     <div class="character-backdrop-blob"></div>
-                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80"
-                        alt="Smiling user holding phone" class="character-img-cutout" />
+                    <img src="{{ url_for('static', filename='img/how_to_portrait.jpg') }}"
+                        alt="Smiling user holding smartphone" class="character-img-cutout" />
                 </div>
 
                 <!-- Right: Circular Numbered Steps (Photo 1) -->
@@ -441,44 +441,134 @@
             </div>
         </section>
 
-        <!-- 7. CURATED ARY PLUS DRAMAS (1-Click Test Queue) -->
-        <section class="drama-queue-section">
+        <!-- 7. UNIVERSAL PLATFORM SPECIFICATIONS & FORMATS -->
+        <section class="platforms-spec-section">
             <div class="section-header-centered">
-                <span class="section-label-light">Instant Queue</span>
+                <span class="section-label-light">Engine Architecture</span>
                 <h2 class="section-title-large">
-                    <span class="highlight">Featured</span> ARY Plus Dramas
+                    <span class="highlight">Supported</span> Platforms &amp; Formats
                 </h2>
             </div>
 
-            <div class="queue-grid">
-                <div class="drama-card"
-                    onclick="fillAndFocus('https://aryplus.tv/video/v2/3/6a89bcc6c0a797111795ce0a/6a57868b5bf57c474cc00a50', '720')">
+            <div class="platforms-spec-grid">
+                <!-- Card 1: YouTube -->
+                <div class="platform-spec-card" onclick="fillAndFocus('https://www.youtube.com/watch?v=dQw4w9WgXcQ', '720')">
                     <div>
-                        <div class="drama-tag">EPISODE 07 • ARY PLUS</div>
-                        <h3>Dar e Nijat</h3>
-                        <p>Complete episode master stream with crystal clear audio sync. Ready for 720p HD transfer.</p>
+                        <div class="platform-card-top">
+                            <div class="platform-card-icon">
+                                <i class="fa-brands fa-youtube" style="color: #ef4444;"></i>
+                            </div>
+                            <div class="platform-card-title">
+                                <h3>YouTube Stream</h3>
+                                <span>Videos, Shorts &amp; Audio</span>
+                            </div>
+                        </div>
+                        <p>Direct Google Video stream decryption with automated JS signature solving. Ultra-fast high-throughput extraction.</p>
                     </div>
-                    <span class="drama-action-link">Download 720p <i class="fa-solid fa-arrow-right"></i></span>
+                    <div class="platform-features-pills">
+                        <span class="platform-spec-tag">4K / 1080p / 720p</span>
+                        <span class="platform-spec-tag">192kbps MP3</span>
+                    </div>
                 </div>
 
-                <div class="drama-card"
-                    onclick="fillAndFocus('https://aryplus.tv/video/v2/3/6a91aa81c0a79711171fc1b8/6a57868b5bf57c474cc00a50', '720')">
+                <!-- Card 2: ARY Plus & Zap -->
+                <div class="platform-spec-card" onclick="fillAndFocus('https://aryplus.tv/video/v2/3/6a89bcc6c0a797111795ce0a/6a57868b5bf57c474cc00a50', '720')">
                     <div>
-                        <div class="drama-tag">EPISODE 08 • ARY PLUS</div>
-                        <h3>Dar e Nijat</h3>
-                        <p>Original high-definition drama stream directly captured from vod.aryzap.com CDN.</p>
+                        <div class="platform-card-top">
+                            <div class="platform-card-icon">
+                                <i class="fa-solid fa-tv" style="color: #10b981;"></i>
+                            </div>
+                            <div class="platform-card-title">
+                                <h3>ARY Plus &amp; Zap</h3>
+                                <span>Drama Serials &amp; Shows</span>
+                            </div>
+                        </div>
+                        <p>Direct HLS fragment pull from vod.aryzap.com origin media clusters with 8-stream parallel fragment stitching.</p>
                     </div>
-                    <span class="drama-action-link">Download 720p <i class="fa-solid fa-arrow-right"></i></span>
+                    <div class="platform-features-pills">
+                        <span class="platform-spec-tag">720p HD Master</span>
+                        <span class="platform-spec-tag">Original Broadcast</span>
+                    </div>
                 </div>
 
-                <div class="drama-card"
-                    onclick="fillAndFocus('https://aryplus.tv/video/v2/3/6a82708bc0a7971117562f74/6a57868b5bf57c474cc00a50', '720')">
+                <!-- Card 3: Instagram -->
+                <div class="platform-spec-card" onclick="document.getElementById('videoUrl').focus()">
                     <div>
-                        <div class="drama-tag">EPISODE 15 • ARY DIGITAL</div>
-                        <h3>Hasrat</h3>
-                        <p>Trending broadcast episode with 32 multi-threaded chunk negotiation for rapid download.</p>
+                        <div class="platform-card-top">
+                            <div class="platform-card-icon">
+                                <i class="fa-brands fa-instagram" style="color: #ec4899;"></i>
+                            </div>
+                            <div class="platform-card-title">
+                                <h3>Instagram Media</h3>
+                                <span>Reels, Feed &amp; Stories</span>
+                            </div>
+                        </div>
+                        <p>Direct Instagram graph extraction for highest-bitrate MP4 streams with zero compression loss or watermarks.</p>
                     </div>
-                    <span class="drama-action-link">Download 720p <i class="fa-solid fa-arrow-right"></i></span>
+                    <div class="platform-features-pills">
+                        <span class="platform-spec-tag">Full HD 1080p</span>
+                        <span class="platform-spec-tag">Lossless MP4</span>
+                    </div>
+                </div>
+
+                <!-- Card 4: TikTok -->
+                <div class="platform-spec-card" onclick="document.getElementById('videoUrl').focus()">
+                    <div>
+                        <div class="platform-card-top">
+                            <div class="platform-card-icon">
+                                <i class="fa-brands fa-tiktok" style="color: #06b6d4;"></i>
+                            </div>
+                            <div class="platform-card-title">
+                                <h3>TikTok Engine</h3>
+                                <span>Clips &amp; Trending Sounds</span>
+                            </div>
+                        </div>
+                        <p>Pure clean video stream extraction removing watermark overlays and preserving high-fidelity audio.</p>
+                    </div>
+                    <div class="platform-features-pills">
+                        <span class="platform-spec-tag">No Watermark</span>
+                        <span class="platform-spec-tag">HD Video &amp; MP3</span>
+                    </div>
+                </div>
+
+                <!-- Card 5: Facebook -->
+                <div class="platform-spec-card" onclick="document.getElementById('videoUrl').focus()">
+                    <div>
+                        <div class="platform-card-top">
+                            <div class="platform-card-icon">
+                                <i class="fa-brands fa-facebook" style="color: #3b82f6;"></i>
+                            </div>
+                            <div class="platform-card-title">
+                                <h3>Facebook Watch</h3>
+                                <span>Reels &amp; Long-Form Videos</span>
+                            </div>
+                        </div>
+                        <p>Optimized CDN extraction supporting both public Watch feeds, group clips, and mobile reel presentations.</p>
+                    </div>
+                    <div class="platform-features-pills">
+                        <span class="platform-spec-tag">1080p / 720p HD</span>
+                        <span class="platform-spec-tag">AAC Stereo Audio</span>
+                    </div>
+                </div>
+
+                <!-- Card 6: X / Twitter -->
+                <div class="platform-spec-card" onclick="document.getElementById('videoUrl').focus()">
+                    <div>
+                        <div class="platform-card-top">
+                            <div class="platform-card-icon">
+                                <i class="fa-brands fa-x-twitter" style="color: #e2e8f0;"></i>
+                            </div>
+                            <div class="platform-card-title">
+                                <h3>X (Twitter) Video</h3>
+                                <span>Post Clips &amp; Broadcasts</span>
+                            </div>
+                        </div>
+                        <p>Instant manifest resolution pulling highest bitrate progressive MP4 streams directly to your local device.</p>
+                    </div>
+                    <div class="platform-features-pills">
+                        <span class="platform-spec-tag">Direct MP4</span>
+                        <span class="platform-spec-tag">Instant Delivery</span>
+                    </div>
                 </div>
             </div>
         </section>
@@ -768,7 +858,18 @@
                 dashboardCard.style.display = 'none';
                 successCard.style.display = 'none';
                 errorCard.style.display = 'block';
-                errorMessage.innerHTML = msg;
+
+                // DOM XSS Defense: Strip scripts, inline handlers, and javascript: links
+                if (typeof msg === 'string' && (msg.includes('<a') || msg.includes('<span') || msg.includes('<br>'))) {
+                    const cleanMsg = msg
+                        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                        .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
+                        .replace(/javascript\s*:/gi, '');
+                    errorMessage.innerHTML = cleanMsg;
+                } else {
+                    errorMessage.textContent = msg || 'An unknown error occurred.';
+                }
+
                 errorCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalBtnHtml;

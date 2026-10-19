@@ -1,6 +1,6 @@
 @echo off
 echo ===================================================
-echo   Starting ARY Plus Downloader...
+echo   Starting Stellar Video Downloader...
 echo ===================================================
 
 if exist .\venv\Scripts\activate.bat (

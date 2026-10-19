@@ -3,6 +3,7 @@ import ipaddress
 import os
 import time
 import threading
+import socket
 from collections import defaultdict
 
 # In-memory storage for IP rate limiting
@@ -18,15 +19,21 @@ MAX_CONCURRENT_DOWNLOADS = 5
 ACTIVE_DOWNLOADS_COUNT = 0
 ACTIVE_LOCK = threading.Lock()
 
+# Restricted non-HTTP service ports to prevent SSRF port scanning
+ALLOWED_PORTS = {80, 443, 8080, 8443}
+
 def check_rate_limit(client_ip):
     """
     Checks if client IP has exceeded the allowed download request rate limit.
     Returns (allowed: bool, retry_after: int)
     """
+    if not client_ip:
+        client_ip = '127.0.0.1'
+
     now = time.time()
     with RATE_LIMIT_LOCK:
-        # Periodic garbage collection for inactive IPs (every ~100 requests)
-        if len(IP_REQUEST_LOG) > 200:
+        # Periodic garbage collection for inactive IPs
+        if len(IP_REQUEST_LOG) > 300:
             stale_ips = [ip for ip, timestamps in IP_REQUEST_LOG.items() if not timestamps or (now - timestamps[-1] > 3600)]
             for ip in stale_ips:
                 del IP_REQUEST_LOG[ip]
@@ -58,10 +65,43 @@ def release_concurrency_slot():
         if ACTIVE_DOWNLOADS_COUNT > 0:
             ACTIVE_DOWNLOADS_COUNT -= 1
 
+def is_prohibited_ip(ip):
+    """
+    Comprehensive verification against all private, loopback, link-local,
+    reserved, multicast, and carrier-grade NAT address spaces.
+    """
+    # Unpack IPv4-mapped IPv6 addresses (e.g. ::ffff:127.0.0.1 -> 127.0.0.1)
+    if hasattr(ip, 'ipv4_mapped') and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+
+    if (
+        ip.is_private or
+        ip.is_loopback or
+        ip.is_link_local or
+        ip.is_reserved or
+        ip.is_multicast or
+        ip.is_unspecified
+    ):
+        return True
+
+    # Carrier Grade NAT (RFC 6598) & IETF Protocol/Benchmark Assignments
+    try:
+        if ip.version == 4:
+            if ip in ipaddress.ip_network('100.64.0.0/10'):
+                return True
+            if ip in ipaddress.ip_network('192.0.0.0/24'):
+                return True
+            if ip in ipaddress.ip_network('198.18.0.0/15'):
+                return True
+    except Exception:
+        pass
+
+    return False
+
 def validate_url(url):
     """
-    Strictly validates input URLs to prevent SSRF, local network scanning, 
-    and arbitrary scheme execution attacks.
+    Strictly validates input URLs to prevent SSRF, DNS rebinding, internal port
+    scanning, local network probing, and CRLF / command injection.
     """
     if not url or not isinstance(url, str):
         return False, "URL is required"
@@ -69,6 +109,10 @@ def validate_url(url):
     url = url.strip()
     if len(url) > 2048:
         return False, "URL length exceeds maximum limit of 2048 characters"
+
+    # Block control characters, CR, LF, and null bytes (Prevents CRLF / HTTP Smuggling)
+    if any(c in url for c in ['\r', '\n', '\0', '\t']):
+        return False, "URL contains illegal control characters"
 
     try:
         parsed = urllib.parse.urlparse(url)
@@ -82,30 +126,39 @@ def validate_url(url):
     if not hostname:
         return False, "Invalid URL hostname"
 
-    hostname = hostname.lower()
+    hostname = hostname.lower().strip()
+
+    # Port restriction: Block non-standard or dangerous services
+    port = parsed.port
+    if port is not None and port not in ALLOWED_PORTS:
+        return False, f"Target port {port} is prohibited. Only standard web ports (80, 443, 8080, 8443) are allowed."
 
     # Block local loopback and internal hostname patterns
-    blocked_hosts = ['localhost', 'loopback', 'local']
+    blocked_hosts = ['localhost', 'loopback', 'local', 'internal', 'intranet']
     if any(h == hostname or hostname.endswith('.' + h) for h in blocked_hosts):
-        return False, "Access to local network destinations is prohibited"
+        return False, "Access to local or internal network destinations is prohibited"
 
-    # Check if hostname is an IP address and block private/reserved IPs
+    # Check if hostname is directly an IP address
     try:
         ip = ipaddress.ip_address(hostname)
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
-            return False, "Access to private or internal IP addresses is prohibited"
+        if is_prohibited_ip(ip):
+            return False, "Access to private, loopback, or reserved IP addresses is prohibited"
     except ValueError:
-        # Domain name - resolve IP via DNS to prevent DNS Rebinding / nip.io spoofing
+        # Hostname is a domain name: Resolve via DNS to verify target IP address
         try:
-            import socket
             resolved_addrs = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+            if not resolved_addrs:
+                return False, "Target domain could not be resolved"
+            
             for addr_info in resolved_addrs:
                 ip_str = addr_info[4][0]
                 resolved_ip = ipaddress.ip_address(ip_str)
-                if resolved_ip.is_private or resolved_ip.is_loopback or resolved_ip.is_link_local or resolved_ip.is_reserved or resolved_ip.is_multicast:
-                    return False, "Target domain resolves to a prohibited internal IP address"
+                if is_prohibited_ip(resolved_ip):
+                    return False, "Target domain resolves to a prohibited internal or reserved IP address"
+        except socket.gaierror:
+            # If domain cannot be resolved via DNS, reject it to prevent blind SSRF
+            return False, "Target domain name does not exist or could not be resolved"
         except Exception:
-            # If DNS resolution fails, allow yt-dlp to handle or fail naturally
             pass
 
     return True, None
