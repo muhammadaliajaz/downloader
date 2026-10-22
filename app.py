@@ -60,18 +60,24 @@ def csrf_cross_origin_guard():
         referer = request.headers.get('Referer')
         host = request.headers.get('Host')
         
+        expected_host = request.headers.get('X-Forwarded-Host') or request.headers.get('Host')
+
+        def _clean_host(h):
+            if not h: return ''
+            return h.split(':')[0].lower()
+
         # Verify Origin if supplied
         if origin:
             try:
                 origin_host = urllib.parse.urlparse(origin).netloc
-                if origin_host and host and origin_host.lower() != host.lower():
+                if origin_host and expected_host and _clean_host(origin_host) != _clean_host(expected_host):
                     return jsonify({'error': 'Cross-Origin forbidden: Request Origin does not match Host'}), 403
             except Exception:
                 return jsonify({'error': 'Malformed Origin header'}), 403
         elif referer:
             try:
                 referer_host = urllib.parse.urlparse(referer).netloc
-                if referer_host and host and referer_host.lower() != host.lower():
+                if referer_host and expected_host and _clean_host(referer_host) != _clean_host(expected_host):
                     return jsonify({'error': 'Cross-Origin forbidden: Referer does not match Host'}), 403
             except Exception:
                 return jsonify({'error': 'Malformed Referer header'}), 403
@@ -96,8 +102,8 @@ def apply_security_headers(response):
 def get_client_ip():
     """Extracts client IP safely without trusting unverified spoofed headers."""
     remote_ip = request.remote_addr or '127.0.0.1'
-    # Only trust X-Forwarded-For if explicitly configured behind a trusted reverse proxy
-    if os.environ.get('TRUST_PROXY', 'false').lower() == 'true':
+    # Auto-detect Heroku (DYNO env exists) or explicitly enabled reverse proxy
+    if 'DYNO' in os.environ or os.environ.get('TRUST_PROXY', 'false').lower() == 'true':
         xff = request.headers.get('X-Forwarded-For')
         if xff:
             first_ip = xff.split(',')[0].strip()

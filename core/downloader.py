@@ -155,6 +155,10 @@ def download_task(task_id, url, format_type, quality, download_dir):
         if path:
             return path
         common_paths = [
+            "/usr/bin/ffmpeg",
+            "/usr/local/bin/ffmpeg",
+            "/app/vendor/ffmpeg/ffmpeg",
+            "/app/vendor/ffmpeg/bin/ffmpeg",
             r"C:\Program Files\ffmpeg\bin\ffmpeg.exe",
             r"C:\Program Files\Gyan\ffmpeg\bin\ffmpeg.exe",
         ]
@@ -181,6 +185,9 @@ def download_task(task_id, url, format_type, quality, download_dir):
         if path:
             return path
         common = [
+            "/usr/bin/node",
+            "/usr/local/bin/node",
+            "/app/bin/node",
             r"C:\Program Files\nodejs\node.exe",
             r"C:\Program Files (x86)\nodejs\node.exe"
         ]
