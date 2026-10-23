@@ -185,7 +185,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         # Check bundled QuickJS first (for Linux Heroku container)
         bundled_qjs = os.path.join(repo_root, 'bin', 'qjs')
-        if os.path.isfile(bundled_qjs):
+        if os.name != 'nt' and os.path.isfile(bundled_qjs):
             try:
                 os.chmod(bundled_qjs, 0o755)
             except Exception:
@@ -228,8 +228,6 @@ def download_task(task_id, url, format_type, quality, download_dir):
         'noplaylist': True,
         'cachedir': False,
         'force_ipv4': True,
-        'youtube_include_dash_manifest': False,
-        'youtube_include_hls_manifest': False,
         'retries': 5,
         'fragment_retries': 5,
         'skip_unavailable_fragments': True,
@@ -331,15 +329,13 @@ def download_task(task_id, url, format_type, quality, download_dir):
             break
 
     # YouTube Cloud Engine:
-    # 1. 'visionos' uses native Apple HLS (.m3u8) manifests which completely bypass:
-    #    - Cloud datacenter bot challenges ("Sign in to confirm you're not a bot")
-    #    - SABR encrypted streaming experiments
-    #    - Web player JavaScript 'n' challenge requirements
-    # 2. 'web' leverages authenticated cookies
-    # 3. 'tv' and 'android' serve as supplemental stream fallbacks
+    # 'visionos' and 'ios' use native Apple HLS (.m3u8) manifests which completely bypass:
+    # 1. Cloud datacenter bot challenges ("Sign in to confirm you're not a bot")
+    # 2. SABR encrypted streaming experiments
+    # 3. Web player JavaScript 'n' challenge requirements
     ydl_opts['extractor_args'] = {
         'youtube': {
-            'player_client': ['visionos', 'web', 'tv', 'android']
+            'player_client': ['visionos', 'ios']
         }
     }
 
@@ -355,12 +351,12 @@ def download_task(task_id, url, format_type, quality, download_dir):
     else:
         ydl_opts['merge_output_format'] = 'mp4'
         if quality == 'best':
-            ydl_opts['format'] = 'bestvideo+bestaudio/best'
+            ydl_opts['format'] = 'bestvideo+bestaudio/bestvideo+bestaudio/best'
         elif quality.isdigit():
             height = quality
-            ydl_opts['format'] = f'bestvideo[height<={height}]+bestaudio/bestvideo+bestaudio/best'
+            ydl_opts['format'] = f'bestvideo[height<={height}]+bestaudio/bestvideo+bestaudio/best[height<={height}]/best'
         else:
-            ydl_opts['format'] = 'bestvideo[height<=720]+bestaudio/bestvideo+bestaudio/best'
+            ydl_opts['format'] = 'bestvideo[height<=720]+bestaudio/bestvideo+bestaudio/best[height<=720]/best'
         
     try:
         # Store metadata as soon as we get it

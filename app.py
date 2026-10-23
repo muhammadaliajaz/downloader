@@ -131,7 +131,7 @@ def health_check():
     qjs_path = os.path.join(repo_root, 'bin', 'qjs')
     return jsonify({
         'status': 'healthy',
-        'version': 'v1.6-qjs',
+        'version': 'v1.7-visionos',
         'has_cookies_txt': os.path.isfile(cookies_path),
         'cookies_size': os.path.getsize(cookies_path) if os.path.isfile(cookies_path) else 0,
         'has_www_cookies': os.path.isfile(www_cookies_path),
@@ -164,11 +164,11 @@ def debug_ytdlp():
         'cookiefile': cookies_path if os.path.isfile(cookies_path) else None,
         'extractor_args': {
             'youtube': {
-                'player_client': ['visionos', 'web', 'tv', 'android']
+                'player_client': ['visionos', 'ios']
             }
         }
     }
-    if os.path.isfile(qjs_path):
+    if os.name != 'nt' and os.path.isfile(qjs_path):
         opts['js_runtimes'] = {'quickjs': {'path': qjs_path}}
         opts['remote_components'] = ['ejs:github']
 
