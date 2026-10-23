@@ -4,6 +4,7 @@ import os
 import threading
 import re
 import time
+import tempfile
 
 from core.ary_extractor import extract_ary_stream, is_ary_url
 from core.tiktok_extractor import extract_tiktok_stream, is_tiktok_url, normalize_tiktok_url
@@ -284,27 +285,28 @@ def download_task(task_id, url, format_type, quality, download_dir):
         '/app/www.youtube.com_cookies.txt'
     ]
     
+    task_cookiefile = None
     has_cookies = False
     for cp in possible_cookie_paths:
         if os.path.isfile(cp) and os.path.getsize(cp) > 10:
-            ydl_opts['cookiefile'] = cp
+            try:
+                task_cookiefile = os.path.join(tempfile.gettempdir(), f"yt_cookies_{task_id}.txt")
+                shutil.copyfile(cp, task_cookiefile)
+                ydl_opts['cookiefile'] = task_cookiefile
+            except Exception:
+                ydl_opts['cookiefile'] = cp
             has_cookies = True
             break
 
-    if has_cookies:
-        # When cookies are supplied, use web client with the authenticated session
-        ydl_opts['extractor_args'] = {
-            'youtube': {
-                'player_client': ['web', 'android']
-            }
+    # Resilient Player Client Fallback Cascade:
+    # 1. 'web' handles authentic full HD formats when session cookies are provided
+    # 2. 'visionos' flawlessly bypasses datacenter IP bot checks and SABR format skips
+    # 3. 'android' and 'ios' serve as supplemental stream fallbacks
+    ydl_opts['extractor_args'] = {
+        'youtube': {
+            'player_client': ['web', 'visionos', 'android', 'ios']
         }
-    else:
-        # Fallback when unauthenticated
-        ydl_opts['extractor_args'] = {
-            'youtube': {
-                'player_client': ['visionos', 'android']
-            }
-        }
+    }
 
     if format_type == 'mp3':
         ydl_opts.update({
@@ -475,6 +477,11 @@ def download_task(task_id, url, format_type, quality, download_dir):
                 'timestamp': time.time()
             }
     finally:
+        if task_cookiefile and os.path.exists(task_cookiefile):
+            try:
+                os.remove(task_cookiefile)
+            except Exception:
+                pass
         # Release server concurrency slot
         release_concurrency_slot()
         # Final cleanup of the event
