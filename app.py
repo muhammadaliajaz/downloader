@@ -122,6 +122,21 @@ def index():
 def preview_ui():
     return redirect(url_for('index'))
 
+@app.route('/api/health')
+def health_check():
+    repo_root = os.path.dirname(os.path.abspath(__file__))
+    cookies_path = os.path.join(repo_root, 'cookies.txt')
+    www_cookies_path = os.path.join(repo_root, 'www.youtube.com_cookies.txt')
+    return jsonify({
+        'status': 'healthy',
+        'version': 'v1.4-visionos',
+        'has_cookies_txt': os.path.isfile(cookies_path),
+        'cookies_size': os.path.getsize(cookies_path) if os.path.isfile(cookies_path) else 0,
+        'has_www_cookies': os.path.isfile(www_cookies_path),
+        'node_found': shutil.which('node'),
+        'ffmpeg_found': shutil.which('ffmpeg')
+    })
+
 @app.route('/api/download', methods=['POST'])
 def trigger_download():
     # 1. Rate Limiting Check (Max 10 requests / min per IP)
