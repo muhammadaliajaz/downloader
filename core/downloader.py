@@ -313,35 +313,78 @@ def download_task(task_id, url, format_type, quality, download_dir):
             title = ary_title or tiktok_title or metadata.get('title') or info_target.get('title', 'Video')
             thumbnail = ary_thumbnail or tiktok_thumbnail or metadata.get('thumbnail') or info_target.get('thumbnail')
             
-            if ary_title:
-                info_target['title'] = ary_title
-
-            expected_filename = ydl.prepare_filename(info_target)
-            if format_type == 'mp3':
-                expected_filename = os.path.splitext(expected_filename)[0] + '.mp3'
+            # Locate the actual downloaded media file on disk
+            actual_filepath = None
             
+            # 1. Check requested_downloads tracked by yt_dlp
+            for source_dict in [info, info_target]:
+                for rd in source_dict.get('requested_downloads', []):
+                    fp = rd.get('filepath')
+                    if fp and os.path.isfile(fp):
+                        actual_filepath = fp
+                        break
+                if actual_filepath:
+                    break
+
+            # 2. Check standard prepare_filename if not found in requested_downloads
+            if not actual_filepath or not os.path.isfile(actual_filepath):
+                prep_fn = ydl.prepare_filename(info_target)
+                if format_type == 'mp3':
+                    prep_fn = os.path.splitext(prep_fn)[0] + '.mp3'
+                if os.path.isfile(prep_fn):
+                    actual_filepath = prep_fn
+
+            # 3. Resilient directory scan for the unique task_id prefix
+            if not actual_filepath or not os.path.isfile(actual_filepath):
+                for f in os.listdir(download_dir):
+                    if f.startswith(f"{task_id}_") and not (f.endswith('.part') or f.endswith('.temp') or f.endswith('.ytdl')):
+                        candidate = os.path.join(download_dir, f)
+                        if os.path.isfile(candidate):
+                            actual_filepath = candidate
+                            break
+
+            if not actual_filepath or not os.path.isfile(actual_filepath):
+                raise Exception("Download failed: Resulting media file was not found on server.")
+
+            # Sanitize title and rename to clean safe file name
+            safe_title = re.sub(r'[\\/*?:"<>|]', "", title).strip() or "video"
+            safe_title = re.sub(r'\s+', ' ', safe_title)[:80]
+            _, actual_ext = os.path.splitext(actual_filepath)
+            
+            desired_filename = os.path.join(download_dir, f"{task_id}_{safe_title}{actual_ext}")
+            final_filepath = actual_filepath
+            if os.path.abspath(actual_filepath) != os.path.abspath(desired_filename):
+                try:
+                    if os.path.exists(desired_filename):
+                        os.remove(desired_filename)
+                    os.rename(actual_filepath, desired_filename)
+                    final_filepath = desired_filename
+                except Exception as e:
+                    print("Rename notice:", e)
+                    final_filepath = actual_filepath
+
             # Security: Path Traversal Defense
-            if not is_safe_filepath(expected_filename, download_dir):
-                if os.path.exists(expected_filename):
+            if not is_safe_filepath(final_filepath, download_dir):
+                if os.path.exists(final_filepath):
                     try:
-                        os.remove(expected_filename)
+                        os.remove(final_filepath)
                     except Exception:
                         pass
                 raise Exception("Target path traversal blocked.")
 
             # Security: Validate file extension against allowed media extensions
             allowed_exts = ['.mp4', '.mp3', '.m4a', '.webm', '.mkv', '.avi', '.mov', '.flv']
-            _, ext = os.path.splitext(expected_filename)
+            _, ext = os.path.splitext(final_filepath)
             if ext.lower() not in allowed_exts:
-                if os.path.exists(expected_filename):
-                    os.remove(expected_filename)
+                if os.path.exists(final_filepath):
+                    os.remove(final_filepath)
                 raise Exception("Downloaded file type is not an allowed media format.")
 
             with CACHE_LOCK:
                 PROGRESS_CACHE[task_id] = {
                     'status': 'finished',
-                    'filepath': expected_filename,
-                    'filename': os.path.basename(expected_filename),
+                    'filepath': final_filepath,
+                    'filename': os.path.basename(final_filepath),
                     'task_id': task_id,
                     'timestamp': time.time(),
                     'title': title,

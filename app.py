@@ -227,9 +227,26 @@ def download_file(task_id):
         
     file_path = progress_data.get('filepath')
     
+    # Resilient fallback: locate task file in DOWNLOADS_DIR if path was slightly mismatched
+    if not file_path or not os.path.isfile(file_path):
+        for fname in os.listdir(DOWNLOADS_DIR):
+            if fname.startswith(f"{task_id}_") and not (fname.endswith('.part') or fname.endswith('.temp') or fname.endswith('.ytdl')):
+                candidate = os.path.join(DOWNLOADS_DIR, fname)
+                if os.path.isfile(candidate):
+                    file_path = candidate
+                    break
+
     # Path Traversal Guard & File Existence Check
     if not file_path or not is_safe_filepath(file_path, DOWNLOADS_DIR) or not os.path.isfile(file_path):
         return jsonify({'error': 'Access Denied: Invalid or restricted file path'}), 403
+
+    # Clean download name for the user's browser
+    raw_title = progress_data.get('title') or 'video'
+    import re
+    clean_title = re.sub(r'[\\/*?:"<>|]', "", raw_title).strip() or "video"
+    clean_title = re.sub(r'\s+', ' ', clean_title)[:80]
+    _, ext = os.path.splitext(file_path)
+    clean_download_name = f"{clean_title}{ext}"
 
     # Background auto-delete after 3 minutes grace period to free disk space
     def secure_delete():
@@ -242,7 +259,7 @@ def download_file(task_id):
                 
     threading.Thread(target=secure_delete, daemon=True).start()
     
-    return send_file(file_path, as_attachment=True)
+    return send_file(file_path, as_attachment=True, download_name=clean_download_name)
 
 if __name__ == '__main__':
     # Production security: debug mode disabled
