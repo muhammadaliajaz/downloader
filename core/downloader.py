@@ -186,6 +186,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
         if path:
             return path
         common = [
+            "/app/.apt/usr/bin/node",
             "/usr/bin/node",
             "/usr/local/bin/node",
             "/app/bin/node",
@@ -339,13 +340,13 @@ def download_task(task_id, url, format_type, quality, download_dir):
     else:
         ydl_opts['merge_output_format'] = 'mp4'
         if quality == 'best':
-            ydl_opts['format'] = 'bestvideo+bestaudio/best'
+            ydl_opts['format'] = 'bv*+ba/b/best'
         elif quality.isdigit():
             height = quality
-            # Direct resolution match for both HLS sub-playlists and standard videos
-            ydl_opts['format'] = f'bestvideo[height<={height}]+bestaudio/best[height<={height}]/best'
+            # Direct resolution match with cascading fallbacks to prevent "Requested format is not available"
+            ydl_opts['format'] = f'bv*[height<={height}]+ba/b[height<={height}]/bv*+ba/b/best'
         else:
-            ydl_opts['format'] = 'bestvideo[height<=720]+bestaudio/best[height<=720]/best'
+            ydl_opts['format'] = 'bv*[height<=720]+ba/b[height<=720]/bv*+ba/b/best'
         
     try:
         # Store metadata as soon as we get it
