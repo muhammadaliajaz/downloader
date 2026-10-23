@@ -250,45 +250,57 @@ def download_task(task_id, url, format_type, quality, download_dir):
         ydl_opts['concurrent_fragments'] = 6
     # Authenticated cookies for YouTube (Bypasses Datacenter IP bot block)
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    cookies_file = os.path.join(repo_root, 'cookies.txt')
     
+    def is_valid_netscape(file_path):
+        try:
+            if not os.path.isfile(file_path) or os.path.getsize(file_path) < 15:
+                return False
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                head = f.read(500)
+                return ('# Netscape' in head or '.youtube.com' in head) and '\t' in head
+        except Exception:
+            return False
+
+    # Check environment variable YOUTUBE_COOKIES, but ONLY write if it is genuine Netscape format
+    env_cookie_file = os.path.join(tempfile.gettempdir(), 'env_youtube_cookies.txt')
     raw_cookies = os.environ.get('YOUTUBE_COOKIES', '').strip()
     if raw_cookies:
         decoded_cookies = None
-        # Try base64 decoding first
         try:
             import base64
             b64_candidate = base64.b64decode(raw_cookies).decode('utf-8', errors='ignore')
-            if 'youtube.com' in b64_candidate or '# Netscape' in b64_candidate or '\t' in b64_candidate:
+            if ('youtube.com' in b64_candidate or '# Netscape' in b64_candidate) and '\t' in b64_candidate:
                 decoded_cookies = b64_candidate
         except Exception:
             pass
 
         if not decoded_cookies:
-            # Handle literal escaped newlines and tabs from single-line environment inputs
             if '\\n' in raw_cookies:
                 raw_cookies = raw_cookies.replace('\\n', '\n').replace('\\t', '\t')
-            decoded_cookies = raw_cookies
+            if ('youtube.com' in raw_cookies or '# Netscape' in raw_cookies) and '\t' in raw_cookies:
+                decoded_cookies = raw_cookies
 
-        try:
-            with open(cookies_file, 'w', encoding='utf-8') as f:
-                f.write(decoded_cookies)
-        except Exception as e:
-            print("Notice writing cookies from env:", e)
+        if decoded_cookies:
+            try:
+                with open(env_cookie_file, 'w', encoding='utf-8') as f:
+                    f.write(decoded_cookies)
+            except Exception as e:
+                print("Notice writing cookies from env:", e)
 
     possible_cookie_paths = [
-        cookies_file,
         os.path.join(repo_root, 'www.youtube.com_cookies.txt'),
-        os.path.join(os.getcwd(), 'cookies.txt'),
-        os.path.join(os.getcwd(), 'www.youtube.com_cookies.txt'),
+        os.path.join(repo_root, 'cookies.txt'),
+        '/app/www.youtube.com_cookies.txt',
         '/app/cookies.txt',
-        '/app/www.youtube.com_cookies.txt'
+        os.path.join(os.getcwd(), 'www.youtube.com_cookies.txt'),
+        os.path.join(os.getcwd(), 'cookies.txt'),
+        env_cookie_file
     ]
     
     task_cookiefile = None
     has_cookies = False
     for cp in possible_cookie_paths:
-        if os.path.isfile(cp) and os.path.getsize(cp) > 10:
+        if is_valid_netscape(cp):
             try:
                 task_cookiefile = os.path.join(tempfile.gettempdir(), f"yt_cookies_{task_id}.txt")
                 shutil.copyfile(cp, task_cookiefile)
