@@ -277,8 +277,11 @@ def download_task(task_id, url, format_type, quality, download_dir):
 
     possible_cookie_paths = [
         cookies_file,
+        os.path.join(repo_root, 'www.youtube.com_cookies.txt'),
         os.path.join(os.getcwd(), 'cookies.txt'),
-        '/app/cookies.txt'
+        os.path.join(os.getcwd(), 'www.youtube.com_cookies.txt'),
+        '/app/cookies.txt',
+        '/app/www.youtube.com_cookies.txt'
     ]
     
     has_cookies = False
