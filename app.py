@@ -141,6 +141,51 @@ def health_check():
         'ffmpeg_found': shutil.which('ffmpeg')
     })
 
+@app.route('/api/debug_ytdlp')
+def debug_ytdlp():
+    url = request.args.get('url', 'https://www.youtube.com/watch?v=Z3QQUSysT9M')
+    import yt_dlp
+    logs = []
+    class CustomLogger:
+        def debug(self, msg): logs.append(f"DEBUG: {msg}")
+        def info(self, msg): logs.append(f"INFO: {msg}")
+        def warning(self, msg): logs.append(f"WARN: {msg}")
+        def error(self, msg): logs.append(f"ERROR: {msg}")
+
+    repo_root = os.path.dirname(os.path.abspath(__file__))
+    cookies_path = os.path.join(repo_root, 'cookies.txt')
+    qjs_path = os.path.join(repo_root, 'bin', 'qjs')
+
+    opts = {
+        'logger': CustomLogger(),
+        'verbose': True,
+        'force_ipv4': True,
+        'noplaylist': True,
+        'cookiefile': cookies_path if os.path.isfile(cookies_path) else None,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['visionos', 'web', 'tv', 'android']
+            }
+        }
+    }
+    if os.path.isfile(qjs_path):
+        opts['js_runtimes'] = {'quickjs': {'path': qjs_path}}
+        opts['remote_components'] = ['ejs:github']
+
+    result = {}
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            result['title'] = info.get('title')
+            result['formats_count'] = len(info.get('formats', []))
+            result['status'] = 'success'
+    except Exception as e:
+        result['status'] = 'failed'
+        result['exception'] = str(e)
+
+    result['logs'] = logs
+    return jsonify(result)
+
 @app.route('/api/download', methods=['POST'])
 def trigger_download():
     # 1. Rate Limiting Check (Max 10 requests / min per IP)
