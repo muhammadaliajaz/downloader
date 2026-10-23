@@ -5,7 +5,7 @@ import threading
 import re
 import time
 
-from core.ary_extractor import extract_ary_stream_sync
+from core.ary_extractor import extract_ary_stream, is_ary_url
 from core.tiktok_extractor import extract_tiktok_stream, is_tiktok_url, normalize_tiktok_url
 from core.security import release_concurrency_slot, is_safe_filepath
 
@@ -59,13 +59,13 @@ def download_task(task_id, url, format_type, quality, download_dir):
     ary_title = None
     ary_thumbnail = None
     
-    if any(domain in url.lower() for domain in ['aryplus.tv', 'aryzap.com']):
+    if is_ary_url(url):
         try:
             with CACHE_LOCK:
                 if task_id in PROGRESS_CACHE:
                     PROGRESS_CACHE[task_id]['title'] = "Connecting to ARY Plus CDN..."
             
-            stream_info = extract_ary_stream_sync(url)
+            stream_info = extract_ary_stream(url)
             if stream_info and stream_info.get('video_url'):
                 target_url = stream_info['video_url']
                 ary_title = stream_info.get('title')
@@ -198,7 +198,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
 
     node_path = get_node_path()
 
-    is_ary = any(domain in url.lower() for domain in ['aryplus.tv', 'aryzap.com', 'vod.aryzap.com'])
+    is_ary = is_ary_url(url) or is_ary_url(target_url)
 
     ydl_opts = {
         'outtmpl': os.path.join(download_dir, f'{task_id}_%(title)s.%(ext)s'),
@@ -313,6 +313,9 @@ def download_task(task_id, url, format_type, quality, download_dir):
             title = ary_title or tiktok_title or metadata.get('title') or info_target.get('title', 'Video')
             thumbnail = ary_thumbnail or tiktok_thumbnail or metadata.get('thumbnail') or info_target.get('thumbnail')
             
+            if ary_title:
+                info_target['title'] = ary_title
+
             expected_filename = ydl.prepare_filename(info_target)
             if format_type == 'mp3':
                 expected_filename = os.path.splitext(expected_filename)[0] + '.mp3'
@@ -363,9 +366,11 @@ def download_task(task_id, url, format_type, quality, download_dir):
         err_msg = re.sub(r'[A-Za-z]:\\[^\s<]+', '[Server Path]', err_msg)
         err_msg = re.sub(r'/(?:[a-zA-Z0-9_\-\.]+/)+[a-zA-Z0-9_\-\.]+', '[Server Path]', err_msg)
         
-        if any(domain in url.lower() for domain in ['aryplus.tv', 'aryzap.com', 'arydigital']):
-            if 'Unsupported URL' in err_msg or 'DRM' in err_msg or 'extractor' in err_msg.lower():
-                err_msg = 'ARY Plus web pages use DRM encryption.<br><span class="block mt-2 font-semibold text-white">👉 <strong>Solution:</strong> Paste the video link directly from <a href="https://www.youtube.com/@ARYDigitalasia" target="_blank" rel="noopener" class="underline text-yellow-400 hover:text-white font-black">ARY Digital Official YouTube Channel</a> to download in Full HD!</span>'
+        if is_ary_url(url):
+            if 'DRM' in err_msg:
+                err_msg = 'This ARY stream is protected by DRM encryption.<br><span class="block mt-2 font-semibold text-white">👉 <strong>Solution:</strong> Paste the video link directly from <a href="https://www.youtube.com/@ARYDigitalasia" target="_blank" rel="noopener" class="underline text-yellow-400 hover:text-white font-black">ARY Digital Official YouTube Channel</a> to download in Full HD!</span>'
+            elif 'Unsupported URL' in err_msg or 'extractor' in err_msg.lower():
+                err_msg = 'Unable to extract stream from this ARY link. Please verify the episode URL from aryplus.tv.'
         with CACHE_LOCK:
             PROGRESS_CACHE[task_id] = {
                 'status': 'error', 
