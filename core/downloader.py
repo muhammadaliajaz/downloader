@@ -299,14 +299,29 @@ def download_task(task_id, url, format_type, quality, download_dir):
         env_cookie_file
     ]
     
+    task_cookiefile = None
+    has_cookies = False
+    for cp in possible_cookie_paths:
+        if is_valid_netscape(cp):
+            try:
+                task_cookiefile = os.path.join(tempfile.gettempdir(), f"yt_cookies_{task_id}.txt")
+                shutil.copyfile(cp, task_cookiefile)
+                ydl_opts['cookiefile'] = task_cookiefile
+            except Exception:
+                ydl_opts['cookiefile'] = cp
+            has_cookies = True
+            break
+
     # YouTube Cloud Engine:
-    # 'visionos' uses native Apple HLS (.m3u8) manifests which completely bypass:
-    # 1. Cloud datacenter bot challenges ("Sign in to confirm you're not a bot")
-    # 2. SABR encrypted streaming experiments
-    # 3. Web player JavaScript 'n' challenge requirements
+    # 1. 'visionos' uses native Apple HLS (.m3u8) manifests which completely bypass:
+    #    - Cloud datacenter bot challenges ("Sign in to confirm you're not a bot")
+    #    - SABR encrypted streaming experiments
+    #    - Web player JavaScript 'n' challenge requirements
+    # 2. 'web' leverages authenticated cookies
+    # 3. 'tv' and 'android' serve as supplemental stream fallbacks
     ydl_opts['extractor_args'] = {
         'youtube': {
-            'player_client': ['visionos', 'tv', 'android']
+            'player_client': ['visionos', 'web', 'tv', 'android']
         }
     }
 
