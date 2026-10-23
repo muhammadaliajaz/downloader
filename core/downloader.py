@@ -249,9 +249,21 @@ def download_task(task_id, url, format_type, quality, download_dir):
         ydl_opts['concurrent_fragments'] = 6
         ydl_opts['extractor_args'] = {
             'youtube': {
-                'player_skip': ['web', 'mweb']
+                'player_client': ['visionos', 'android']
             }
         }
+
+    # Optional authenticated cookies for YouTube
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    cookies_path = os.path.join(repo_root, 'cookies.txt')
+    if not os.path.isfile(cookies_path) and os.environ.get('YOUTUBE_COOKIES'):
+        try:
+            with open(cookies_path, 'w', encoding='utf-8') as f:
+                f.write(os.environ['YOUTUBE_COOKIES'])
+        except Exception:
+            pass
+    if os.path.isfile(cookies_path):
+        ydl_opts['cookiefile'] = cookies_path
 
     if format_type == 'mp3':
         ydl_opts.update({
