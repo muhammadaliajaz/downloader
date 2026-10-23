@@ -312,15 +312,20 @@ def download_task(task_id, url, format_type, quality, download_dir):
             break
 
     # Resilient Player Client Fallback Cascade:
-    # 1. 'tv' (Smart TV API) has ZERO botguard login walls on datacenter IPs
-    # 2. 'ios' serves clean streams without desktop bot barriers
-    # 3. 'web' uses authenticated cookies if available
-    # 4. 'android' as supplemental fallback
-    ydl_opts['extractor_args'] = {
-        'youtube': {
-            'player_client': ['tv', 'ios', 'web', 'android']
+    # When authentic cookies are present, 'web' client delivers full high-res streams
+    # Fallback to 'tv', 'ios', 'android' ensures zero interruption
+    if has_cookies:
+        ydl_opts['extractor_args'] = {
+            'youtube': {
+                'player_client': ['web', 'tv', 'ios', 'android']
+            }
         }
-    }
+    else:
+        ydl_opts['extractor_args'] = {
+            'youtube': {
+                'player_client': ['tv', 'ios', 'android']
+            }
+        }
 
     if format_type == 'mp3':
         ydl_opts.update({
