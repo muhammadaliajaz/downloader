@@ -250,7 +250,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
         ydl_opts['concurrent_fragments'] = 4
     else:
         ydl_opts['concurrent_fragments'] = 6
-    # Authenticated cookies for YouTube (Bypasses Datacenter IP bot block)
+    task_cookiefile = None
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
     def is_valid_netscape(file_path):
@@ -299,34 +299,16 @@ def download_task(task_id, url, format_type, quality, download_dir):
         env_cookie_file
     ]
     
-    task_cookiefile = None
-    has_cookies = False
-    for cp in possible_cookie_paths:
-        if is_valid_netscape(cp):
-            try:
-                task_cookiefile = os.path.join(tempfile.gettempdir(), f"yt_cookies_{task_id}.txt")
-                shutil.copyfile(cp, task_cookiefile)
-                ydl_opts['cookiefile'] = task_cookiefile
-            except Exception:
-                ydl_opts['cookiefile'] = cp
-            has_cookies = True
-            break
-
-    # Resilient Player Client Fallback Cascade:
-    # When authentic cookies are present, 'web' client delivers full high-res streams
-    # Fallback to 'tv', 'ios', 'android' ensures zero interruption
-    if has_cookies:
-        ydl_opts['extractor_args'] = {
-            'youtube': {
-                'player_client': ['web', 'tv', 'ios', 'android']
-            }
+    # YouTube Cloud Engine:
+    # 'visionos' uses native Apple HLS (.m3u8) manifests which completely bypass:
+    # 1. Cloud datacenter bot challenges ("Sign in to confirm you're not a bot")
+    # 2. SABR encrypted streaming experiments
+    # 3. Web player JavaScript 'n' challenge requirements
+    ydl_opts['extractor_args'] = {
+        'youtube': {
+            'player_client': ['visionos', 'tv', 'android']
         }
-    else:
-        ydl_opts['extractor_args'] = {
-            'youtube': {
-                'player_client': ['tv', 'ios', 'android']
-            }
-        }
+    }
 
     if format_type == 'mp3':
         ydl_opts.update({
@@ -340,13 +322,12 @@ def download_task(task_id, url, format_type, quality, download_dir):
     else:
         ydl_opts['merge_output_format'] = 'mp4'
         if quality == 'best':
-            ydl_opts['format'] = 'bv*+ba/b/best'
+            ydl_opts['format'] = 'bestvideo+bestaudio/best'
         elif quality.isdigit():
             height = quality
-            # Direct resolution match with cascading fallbacks to prevent "Requested format is not available"
-            ydl_opts['format'] = f'bv*[height<={height}]+ba/b[height<={height}]/bv*+ba/b/best'
+            ydl_opts['format'] = f'bestvideo[height<={height}]+bestaudio/bestvideo+bestaudio/best'
         else:
-            ydl_opts['format'] = 'bv*[height<=720]+ba/b[height<=720]/bv*+ba/b/best'
+            ydl_opts['format'] = 'bestvideo[height<=720]+bestaudio/bestvideo+bestaudio/best'
         
     try:
         # Store metadata as soon as we get it

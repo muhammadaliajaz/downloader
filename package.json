@@ -1,9 +1,0 @@
-{
-  "name": "downloader",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Video downloader",
-  "engines": {
-    "node": ">=18.0.0"
-  }
-}
