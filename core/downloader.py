@@ -253,17 +253,25 @@ def download_task(task_id, url, format_type, quality, download_dir):
             }
         }
 
-    # Optional authenticated cookies for YouTube
+    # Authenticated cookies for YouTube (Bypasses Datacenter IP bot block)
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    cookies_path = os.path.join(repo_root, 'cookies.txt')
-    if not os.path.isfile(cookies_path) and os.environ.get('YOUTUBE_COOKIES'):
+    cookies_file = os.path.join(repo_root, 'cookies.txt')
+    if os.environ.get('YOUTUBE_COOKIES'):
         try:
-            with open(cookies_path, 'w', encoding='utf-8') as f:
-                f.write(os.environ['YOUTUBE_COOKIES'])
-        except Exception:
-            pass
-    if os.path.isfile(cookies_path):
-        ydl_opts['cookiefile'] = cookies_path
+            with open(cookies_file, 'w', encoding='utf-8') as f:
+                f.write(os.environ['YOUTUBE_COOKIES'].strip())
+        except Exception as e:
+            print("Notice writing cookies from env:", e)
+
+    possible_cookie_paths = [
+        cookies_file,
+        os.path.join(os.getcwd(), 'cookies.txt'),
+        '/app/cookies.txt'
+    ]
+    for cp in possible_cookie_paths:
+        if os.path.isfile(cp) and os.path.getsize(cp) > 0:
+            ydl_opts['cookiefile'] = cp
+            break
 
     if format_type == 'mp3':
         ydl_opts.update({
