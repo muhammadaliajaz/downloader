@@ -249,7 +249,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
         ydl_opts['concurrent_fragments'] = 6
         ydl_opts['extractor_args'] = {
             'youtube': {
-                'player_client': ['web', 'ios', 'android']
+                'player_skip': ['web', 'mweb']
             }
         }
 
@@ -263,6 +263,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
             }],
         })
     else:
+        ydl_opts['merge_output_format'] = 'mp4'
         if quality == 'best':
             ydl_opts['format'] = 'bestvideo+bestaudio/best'
         elif quality.isdigit():
