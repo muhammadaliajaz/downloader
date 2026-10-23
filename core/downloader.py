@@ -180,12 +180,29 @@ def download_task(task_id, url, format_type, quality, download_dir):
     if ffmpeg_path:
         os.environ['FFMPEG_BINARY'] = ffmpeg_path
 
-    # Detect Node.js runtime for YouTube challenge solving
-    def get_node_path():
-        path = shutil.which('node')
-        if path:
-            return path
-        common = [
+    # Detect JavaScript runtime for solving YouTube BotGuard & n-cipher challenges
+    def get_js_runtime():
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        # Check bundled QuickJS first (for Linux Heroku container)
+        bundled_qjs = os.path.join(repo_root, 'bin', 'qjs')
+        if os.path.isfile(bundled_qjs):
+            try:
+                os.chmod(bundled_qjs, 0o755)
+            except Exception:
+                pass
+            return ('quickjs', bundled_qjs)
+            
+        common_qjs = ['/app/bin/qjs', '/usr/bin/qjs', '/usr/local/bin/qjs']
+        for p in common_qjs:
+            if os.path.isfile(p):
+                return ('quickjs', p)
+
+        # Fallback to Node.js
+        node_path = shutil.which('node')
+        if node_path:
+            return ('node', node_path)
+            
+        common_node = [
             "/app/.apt/usr/bin/node",
             "/usr/bin/node",
             "/usr/local/bin/node",
@@ -193,12 +210,13 @@ def download_task(task_id, url, format_type, quality, download_dir):
             r"C:\Program Files\nodejs\node.exe",
             r"C:\Program Files (x86)\nodejs\node.exe"
         ]
-        for p in common:
+        for p in common_node:
             if os.path.isfile(p):
-                return p
-        return None
+                return ('node', p)
+                
+        return (None, None)
 
-    node_path = get_node_path()
+    js_type, js_path = get_js_runtime()
 
     is_ary = is_ary_url(url) or is_ary_url(target_url)
 
@@ -228,8 +246,8 @@ def download_task(task_id, url, format_type, quality, download_dir):
     if ffmpeg_path:
         ydl_opts['ffmpeg_location'] = ffmpeg_path
 
-    if node_path:
-        ydl_opts['js_runtimes'] = {'node': {'path': node_path}}
+    if js_type and js_path:
+        ydl_opts['js_runtimes'] = {js_type: {'path': js_path}}
         ydl_opts['remote_components'] = ['ejs:github']
 
     if is_ary:

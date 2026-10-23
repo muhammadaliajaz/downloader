@@ -128,12 +128,15 @@ def health_check():
     repo_root = os.path.dirname(os.path.abspath(__file__))
     cookies_path = os.path.join(repo_root, 'cookies.txt')
     www_cookies_path = os.path.join(repo_root, 'www.youtube.com_cookies.txt')
+    qjs_path = os.path.join(repo_root, 'bin', 'qjs')
     return jsonify({
         'status': 'healthy',
-        'version': 'v1.4-visionos',
+        'version': 'v1.6-qjs',
         'has_cookies_txt': os.path.isfile(cookies_path),
         'cookies_size': os.path.getsize(cookies_path) if os.path.isfile(cookies_path) else 0,
         'has_www_cookies': os.path.isfile(www_cookies_path),
+        'has_qjs': os.path.isfile(qjs_path),
+        'qjs_size': os.path.getsize(qjs_path) if os.path.isfile(qjs_path) else 0,
         'node_found': shutil.which('node'),
         'ffmpeg_found': shutil.which('ffmpeg')
     })
