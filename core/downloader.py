@@ -208,6 +208,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
         'no_warnings': True,
         'noplaylist': True,
         'cachedir': False,
+        'force_ipv4': True,
         'youtube_include_dash_manifest': False,
         'youtube_include_hls_manifest': False,
         'retries': 5,
@@ -311,12 +312,13 @@ def download_task(task_id, url, format_type, quality, download_dir):
             break
 
     # Resilient Player Client Fallback Cascade:
-    # 1. 'web' handles authentic full HD formats when session cookies are provided
-    # 2. 'visionos' flawlessly bypasses datacenter IP bot checks and SABR format skips
-    # 3. 'android' and 'ios' serve as supplemental stream fallbacks
+    # 1. 'tv' (Smart TV API) has ZERO botguard login walls on datacenter IPs
+    # 2. 'ios' serves clean streams without desktop bot barriers
+    # 3. 'web' uses authenticated cookies if available
+    # 4. 'android' as supplemental fallback
     ydl_opts['extractor_args'] = {
         'youtube': {
-            'player_client': ['web', 'visionos', 'android', 'ios']
+            'player_client': ['tv', 'ios', 'web', 'android']
         }
     }
 
