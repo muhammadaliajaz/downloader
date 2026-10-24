@@ -10,3 +10,4 @@ psycopg2-binary>=2.9.9
 python-dotenv>=1.0.0
 qrcode>=8.0
 pillow>=10.0.0
+yt-dlp-ejs>=0.8.0

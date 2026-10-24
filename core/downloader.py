@@ -246,7 +246,10 @@ def download_task(task_id, url, format_type, quality, download_dir):
 
     if js_type and js_path:
         ydl_opts['js_runtimes'] = {js_type: {'path': js_path}}
-        ydl_opts['remote_components'] = ['ejs:github']
+        try:
+            import yt_dlp_ejs
+        except ImportError:
+            ydl_opts['remote_components'] = ['ejs:github']
 
     if is_ary:
         ydl_opts['http_headers'] = {
@@ -329,13 +332,15 @@ def download_task(task_id, url, format_type, quality, download_dir):
             break
 
     # YouTube Cloud Engine:
-    # 'android' and 'ios' native mobile clients bypass:
-    # 1. Web BotGuard / Cloud challenges ("Sign in to confirm you're not a bot")
-    # 2. SABR encrypted streaming experiments
-    # 3. JavaScript n-challenge deciphering failures
+    # 1. 'visionos' uses native Apple HLS (.m3u8) manifests which completely bypass:
+    #    - Cloud datacenter bot challenges ("Sign in to confirm you're not a bot")
+    #    - SABR encrypted streaming experiments
+    #    - Web player JavaScript 'n' challenge requirements
+    # 2. 'ios' serves as resilient Apple client fallback
+    # 3. 'android' as third mobile fallback
     ydl_opts['extractor_args'] = {
         'youtube': {
-            'player_client': ['android', 'ios']
+            'player_client': ['visionos', 'ios', 'android']
         }
     }
 
@@ -384,12 +389,12 @@ def download_task(task_id, url, format_type, quality, download_dir):
         
         # Multi-tier extraction with automatic fallback for bot detection & format missing
         fallback_strategies = [
-            # Tier 1: Configured options with Android & iOS mobile clients
+            # Tier 1: Apple VisionOS & iOS HLS engine (Datacenter-resilient, no challenge/BotGuard)
             dict(ydl_opts),
             # Tier 2: Clean Mobile bypass without cookies (bypasses expired cookie poison)
-            {**ydl_opts, 'cookiefile': None, 'extractor_args': {'youtube': {'player_client': ['android', 'ios']}}},
+            {**ydl_opts, 'cookiefile': None, 'extractor_args': {'youtube': {'player_client': ['visionos', 'ios']}}},
             # Tier 3: Mobile web fallback with broadest format selector
-            {**ydl_opts, 'cookiefile': None, 'format': 'best/bestvideo+bestaudio', 'extractor_args': {'youtube': {'player_client': ['mweb', 'android']}}}
+            {**ydl_opts, 'cookiefile': None, 'format': 'best/bestvideo+bestaudio/b', 'extractor_args': {'youtube': {'player_client': ['ios', 'android', 'mweb']}}}
         ]
         
         for opts in fallback_strategies:
@@ -412,7 +417,10 @@ def download_task(task_id, url, format_type, quality, download_dir):
                 if cancel_event.is_set():
                     raise CancelledError("User requested cancellation")
                 err_str = str(e).lower()
-                bot_or_format_issues = ['sign in', 'bot', 'cookie', 'format', '429', 'unavailable', 'po_token', 'reloaded']
+                bot_or_format_issues = [
+                    'sign in', 'bot', 'cookie', 'format', '429', 'unavailable', 
+                    'po_token', 'reloaded', 'expecting value', 'json', 'column 1', 'char 0', '403'
+                ]
                 if any(k in err_str for k in bot_or_format_issues) and attempt_idx < len(fallback_strategies) - 1:
                     print(f"Extraction tier {attempt_idx+1} hit issue ({e}). Retrying with fallback client...")
                     time.sleep(0.5)
@@ -538,6 +546,10 @@ def download_task(task_id, url, format_type, quality, download_dir):
                 err_msg = 'This ARY stream is protected by DRM encryption.<br><span class="block mt-2 font-semibold text-white">👉 <strong>Solution:</strong> Paste the video link directly from <a href="https://www.youtube.com/@ARYDigitalasia" target="_blank" rel="noopener" class="underline text-yellow-400 hover:text-white font-black">ARY Digital Official YouTube Channel</a> to download in Full HD!</span>'
             elif 'Unsupported URL' in err_msg or 'extractor' in err_msg.lower():
                 err_msg = 'Unable to extract stream from this ARY link. Please verify the episode URL from aryplus.tv.'
+        elif any(k in err_msg.lower() for k in ['expecting value', 'jsondecode', 'line 1 column 1']):
+            err_msg = 'The video stream provider sent a temporary response. Please try again or paste another video URL.'
+        elif any(k in err_msg.lower() for k in ['sign in', 'confirm you', 'bot']):
+            err_msg = 'This video requires account verification or is restricted by the provider. Please try another video link.'
         with CACHE_LOCK:
             PROGRESS_CACHE[task_id] = {
                 'status': 'error', 

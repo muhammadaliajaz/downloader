@@ -342,13 +342,16 @@ def debug_ytdlp():
         'cookiefile': cookies_path if os.path.isfile(cookies_path) and os.path.getsize(cookies_path) > 100 else None,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'ios']
+                'player_client': ['visionos', 'ios', 'android']
             }
         }
     }
     if os.name != 'nt' and os.path.isfile(qjs_path):
         opts['js_runtimes'] = {'quickjs': {'path': qjs_path}}
-        opts['remote_components'] = ['ejs:github']
+        try:
+            import yt_dlp_ejs
+        except ImportError:
+            opts['remote_components'] = ['ejs:github']
 
     result = {}
     try:
