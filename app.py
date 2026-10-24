@@ -88,8 +88,13 @@ ACTIVE_SSE_BY_IP = {}   # {client_ip: int}
 MAX_SSE_PER_TASK = 2    # Max 2 concurrent SSE listeners per task ID
 MAX_SSE_PER_IP = 3      # Max 3 concurrent SSE listeners per client IP
 
-# Initialize Database Schema
-init_db()
+# Initialize Database Schema safely
+try:
+    init_db()
+except Exception as e:
+    import traceback
+    print(f"[DATABASE INIT ERROR] Could not initialize database on boot: {e}", flush=True)
+    traceback.print_exc()
 
 # Custom Secret Admin URL Slug (Default is 'stellar-vault-786', customizable via ADMIN_SLUG in .env)
 ADMIN_SLUG = (os.environ.get('ADMIN_SLUG') or 'stellar-vault-786').strip().strip('/')

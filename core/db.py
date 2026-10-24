@@ -92,18 +92,13 @@ def _parse_postgres_connection_params(url):
     else:
         host = host_port
 
-    # Supabase IPv6-only direct host fallback for IPv4 networks
-    can_resolve = False
-    try:
-        socket.getaddrinfo(host, port)
-        can_resolve = True
-    except Exception:
-        pass
-
-    if not can_resolve and host.startswith('db.') and host.endswith('.supabase.co'):
+    # Supabase direct endpoints (db.<ref>.supabase.co) are IPv6-only worldwide.
+    # Heroku dynos and IPv4 networks MUST always route through the IPv4 Supavisor connection pooler.
+    if host.startswith('db.') and host.endswith('.supabase.co'):
         proj_ref = host.split('.')[1]
         host = 'aws-0-ap-northeast-2.pooler.supabase.com'
-        user = f'postgres.{proj_ref}'
+        if not user.startswith('postgres.'):
+            user = f'postgres.{proj_ref}'
         port = 5432
 
     return {
@@ -640,19 +635,26 @@ def check_and_publish_scheduled():
 
 def get_setting(key, default=''):
     """Fetches a setting value by key, falling back to DEFAULT_SETTINGS."""
-    conn = get_db_connection()
-    row = conn.execute('SELECT value FROM settings WHERE key = ?', (key,)).fetchone()
-    conn.close()
-    if row and row['value']:
-        return row['value']
+    try:
+        conn = get_db_connection()
+        row = conn.execute('SELECT value FROM settings WHERE key = ?', (key,)).fetchone()
+        conn.close()
+        if row and row['value']:
+            return row['value']
+    except Exception:
+        pass
     return DEFAULT_SETTINGS.get(key, default)
 
 def get_all_settings():
     """Returns all settings as a dict with full defaults populated."""
-    conn = get_db_connection()
-    rows = conn.execute('SELECT key, value FROM settings').fetchall()
-    conn.close()
-    settings_dict = {r['key']: r['value'] for r in rows}
+    settings_dict = {}
+    try:
+        conn = get_db_connection()
+        rows = conn.execute('SELECT key, value FROM settings').fetchall()
+        conn.close()
+        settings_dict = {r['key']: r['value'] for r in rows}
+    except Exception as e:
+        print(f"[SETTINGS NOTICE] DB query fallback to defaults: {e}", flush=True)
     # Ensure all defaults are present
     for k, v in DEFAULT_SETTINGS.items():
         if k not in settings_dict or not settings_dict[k]:
