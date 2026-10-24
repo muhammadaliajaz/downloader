@@ -8,9 +8,17 @@ from core.auth import validate_csrf_token
 
 blog_bp = Blueprint('blog', __name__)
 
+BLOG_LAST_SCHEDULED_CHECK = 0
+
 @blog_bp.before_request
 def trigger_scheduled_publish():
-    """Silently transitions any due scheduled articles to published status."""
+    """Silently transitions any due scheduled articles to published status (throttled to 60s)."""
+    global BLOG_LAST_SCHEDULED_CHECK
+    import time
+    now = time.time()
+    if now - BLOG_LAST_SCHEDULED_CHECK < 60:
+        return
+    BLOG_LAST_SCHEDULED_CHECK = now
     try:
         check_and_publish_scheduled()
     except Exception:

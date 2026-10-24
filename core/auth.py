@@ -125,33 +125,18 @@ def logout_user():
     """Logs the current user out."""
     session.clear()
 
-def is_authenticated() -> bool:
-    """Checks if a user is currently authenticated in session and verifies session security stamp."""
-    user_id = session.get('user_id')
-    if not user_id:
-        return False
-    
-    sess_stamp = session.get('security_stamp')
-    conn = get_db_connection()
-    user = conn.execute("SELECT id, security_stamp FROM users WHERE id = ?", (user_id,)).fetchone()
-    conn.close()
-    
-    if not user:
-        session.clear()
-        return False
-
-    # If user security_stamp exists in DB, ensure session matches (revokes on password change)
-    if user['security_stamp'] and sess_stamp and user['security_stamp'] != sess_stamp:
-        session.clear()
-        return False
-
-    return True
-
 def get_current_user():
-    """Returns the current logged-in user dictionary or None."""
+    """Returns the current logged-in user dictionary or None, cached per-request (0ms latency on repeated calls)."""
+    from flask import has_request_context, g
+    if has_request_context() and hasattr(g, '_current_user'):
+        return g._current_user
+
     user_id = session.get('user_id')
     if not user_id:
+        if has_request_context():
+            g._current_user = None
         return None
+
     conn = get_db_connection()
     user = conn.execute("""
         SELECT id, username, email, role, display_name, created_at, last_login, security_stamp,
@@ -159,7 +144,27 @@ def get_current_user():
         FROM users WHERE id = ?
     """, (user_id,)).fetchone()
     conn.close()
+
+    if has_request_context():
+        g._current_user = user
     return user
+
+def is_authenticated() -> bool:
+    """Checks if a user is currently authenticated in session and verifies session security stamp."""
+    user = get_current_user()
+    if not user:
+        return False
+
+    sess_stamp = session.get('security_stamp')
+    # If user security_stamp exists in DB, ensure session matches (revokes on password change)
+    if user['security_stamp'] and sess_stamp and user['security_stamp'] != sess_stamp:
+        session.clear()
+        from flask import has_request_context, g
+        if has_request_context():
+            g._current_user = None
+        return False
+
+    return True
 
 def login_required(f):
     """Decorator to require login for a route."""

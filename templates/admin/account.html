@@ -499,7 +499,7 @@
 </div>
 
 <!-- Client-side Scripts for Tab Switching, Backup Codes Download & Clipboard -->
-<script>
+<script nonce="{{ csp_nonce }}">
     function switchAccountTab(tabName) {
         // 1. Update tab button active states
         const tabBtns = document.querySelectorAll('#accountTabsBar .cms-tab-btn');
@@ -532,8 +532,16 @@
         }
     }
 
-    // Initialize tab from URL on page load
+    // Initialize tab from URL on page load and attach listeners
     document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('#accountTabsBar .cms-tab-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const tab = this.getAttribute('data-tab');
+                if (tab) switchAccountTab(tab);
+            });
+        });
+
         const urlParams = new URLSearchParams(window.location.search);
         const queryTab = urlParams.get('tab');
         const hashTab = window.location.hash.replace('#', '');

@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import socket
 import sqlite3
 import threading
@@ -237,9 +238,11 @@ class PostgresCursorWrapper:
             pass
 
 class PostgresConnectionWrapper:
-    """Wraps a psycopg2 connection to mimic sqlite3.Connection behavior."""
-    def __init__(self, raw_conn):
+    """Wraps a psycopg2 connection to mimic sqlite3.Connection behavior with pooling support."""
+    def __init__(self, raw_conn, pool=None):
         self._conn = raw_conn
+        self._pool = pool
+        self._closed = False
 
     def cursor(self):
         import psycopg2.extras
@@ -262,10 +265,20 @@ class PostgresConnectionWrapper:
         return self._conn.rollback()
 
     def close(self):
-        try:
-            self._conn.close()
-        except Exception:
-            pass
+        if self._closed:
+            return
+        self._closed = True
+        if self._pool is not None:
+            try:
+                # Return the connection back to the warm pool for instant reuse
+                self._pool.putconn(self._conn)
+            except Exception:
+                pass
+        else:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
 
     def __enter__(self):
         return self
@@ -277,21 +290,55 @@ class PostgresConnectionWrapper:
             self.commit()
 
 # ============================================================================
-# Unified Database Connection Interface
+# Unified Database Connection Interface with High-Performance Pooling
 # ============================================================================
+
+_PG_POOL = None
+_PG_POOL_LOCK = threading.Lock()
+
+def _get_pg_pool():
+    """Initializes and returns a thread-safe persistent connection pool for Supabase."""
+    global _PG_POOL
+    if _PG_POOL is None and is_postgres_enabled():
+        with _PG_POOL_LOCK:
+            if _PG_POOL is None:
+                try:
+                    from psycopg2.pool import ThreadedConnectionPool
+                    params = _parse_postgres_connection_params(get_database_url())
+                    _PG_POOL = ThreadedConnectionPool(minconn=1, maxconn=10, **params)
+                except Exception as e:
+                    print(f"[DATABASE POOL NOTICE] Could not initialize ThreadedConnectionPool: {e}", flush=True)
+                    _PG_POOL = None
+    return _PG_POOL
 
 def get_db_connection():
     """
     Returns an active database connection:
-    - If DATABASE_URL is set -> PostgreSQL (Supabase) via PostgresConnectionWrapper.
+    - If DATABASE_URL is set -> Warm connection from ThreadedConnectionPool (0ms latency).
     - Otherwise -> Local SQLite connection with Row factory.
     """
     if is_postgres_enabled():
+        pool = _get_pg_pool()
+        if pool is not None:
+            try:
+                raw_conn = pool.getconn()
+                # Verify socket is alive
+                if raw_conn.closed != 0:
+                    try:
+                        pool.putconn(raw_conn, close=True)
+                    except Exception:
+                        pass
+                    raw_conn = pool.getconn()
+                return PostgresConnectionWrapper(raw_conn, pool=pool)
+            except Exception as e:
+                print(f"[DATABASE POOL NOTICE] getconn failed ({e}), trying direct connection.", flush=True)
+
+        # Fallback to direct connect if pool is full or unavailable
         try:
             import psycopg2
             params = _parse_postgres_connection_params(get_database_url())
             raw_conn = psycopg2.connect(**params)
-            return PostgresConnectionWrapper(raw_conn)
+            return PostgresConnectionWrapper(raw_conn, pool=None)
         except Exception as e:
             print(f"[DATABASE NOTICE] PostgreSQL connection failed: {e}. Falling back to SQLite.", flush=True)
 
@@ -636,41 +683,51 @@ def check_and_publish_scheduled():
         conn.close()
         return updated_count or 0
 
+_SETTINGS_CACHE = None
+_SETTINGS_CACHE_TIME = 0
+_SETTINGS_LOCK = threading.Lock()
+
 def get_setting(key, default=''):
-    """Fetches a setting value by key, falling back to DEFAULT_SETTINGS."""
-    try:
-        conn = get_db_connection()
-        row = conn.execute('SELECT value FROM settings WHERE key = ?', (key,)).fetchone()
-        conn.close()
-        if row and row['value']:
-            return row['value']
-    except Exception:
-        pass
-    return DEFAULT_SETTINGS.get(key, default)
+    """Fetches a setting value by key instantly from cache, falling back to DEFAULT_SETTINGS."""
+    settings = get_all_settings()
+    return settings.get(key, DEFAULT_SETTINGS.get(key, default))
 
 def get_all_settings():
-    """Returns all settings as a dict with full defaults populated."""
-    settings_dict = {}
-    try:
-        conn = get_db_connection()
-        rows = conn.execute('SELECT key, value FROM settings').fetchall()
-        conn.close()
-        settings_dict = {r['key']: r['value'] for r in rows}
-    except Exception as e:
-        print(f"[SETTINGS NOTICE] DB query fallback to defaults: {e}", flush=True)
-    # Ensure all defaults are present
-    for k, v in DEFAULT_SETTINGS.items():
-        if k not in settings_dict or not settings_dict[k]:
-            settings_dict[k] = v
-    return settings_dict
+    """Returns all settings as a dict with full defaults, cached in-memory for 60 seconds (0ms latency)."""
+    global _SETTINGS_CACHE, _SETTINGS_CACHE_TIME
+    now = time.time()
+    if _SETTINGS_CACHE is not None and (now - _SETTINGS_CACHE_TIME < 60):
+        return dict(_SETTINGS_CACHE)
+
+    with _SETTINGS_LOCK:
+        if _SETTINGS_CACHE is not None and (now - _SETTINGS_CACHE_TIME < 60):
+            return dict(_SETTINGS_CACHE)
+
+        settings_dict = {}
+        try:
+            conn = get_db_connection()
+            rows = conn.execute('SELECT key, value FROM settings').fetchall()
+            conn.close()
+            settings_dict = {r['key']: r['value'] for r in rows}
+        except Exception as e:
+            pass
+        # Ensure all defaults are present
+        for k, v in DEFAULT_SETTINGS.items():
+            if k not in settings_dict or not settings_dict[k]:
+                settings_dict[k] = v
+        _SETTINGS_CACHE = settings_dict
+        _SETTINGS_CACHE_TIME = now
+        return dict(settings_dict)
 
 def set_setting(key, value):
-    """Sets or updates a setting value."""
+    """Sets or updates a setting value and invalidates settings cache."""
+    global _SETTINGS_CACHE
     with DB_LOCK:
         conn = get_db_connection()
         conn.execute('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?', (key, value, value))
         conn.commit()
         conn.close()
+    _SETTINGS_CACHE = None
 
 def log_audit_event(action, details='', user_id=None, username=None, ip_address=None, user_agent=None):
     """Logs administrative & security actions to audit_logs table."""

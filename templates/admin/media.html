@@ -124,7 +124,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
     // Copy URL function with tooltip notification
     function copyMediaUrl(relativeUrl, btn) {
         const fullUrl = window.location.origin + relativeUrl;

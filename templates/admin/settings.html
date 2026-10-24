@@ -167,7 +167,7 @@
 </div>
 
 <!-- Client-side Scripts for Settings Tab Switching -->
-<script>
+<script nonce="{{ csp_nonce }}">
     function switchSettingsTab(tabName) {
         const tabBtns = document.querySelectorAll('#settingsTabsBar .cms-tab-btn');
         tabBtns.forEach(btn => {
@@ -198,6 +198,14 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('#settingsTabsBar .cms-tab-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const tab = this.getAttribute('data-tab');
+                if (tab) switchSettingsTab(tab);
+            });
+        });
+
         const urlParams = new URLSearchParams(window.location.search);
         const queryTab = urlParams.get('tab');
         const hashTab = window.location.hash.replace('#', '');

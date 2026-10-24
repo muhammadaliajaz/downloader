@@ -92,7 +92,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="{{ csp_nonce }}">
         function togglePass(id, btn) {
             const input = document.getElementById(id);
             const icon = btn.querySelector('i');

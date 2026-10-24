@@ -201,21 +201,33 @@ def security_before_request():
 
         def _clean_host(h):
             if not h: return ''
-            return h.split(':')[0].lower()
+            h = h.split(':')[0].lower().strip()
+            if h.startswith('www.'):
+                h = h[4:]
+            return h
+
+        # Known authorized application domains
+        app_domains = {'aryplusdownloader.tech', 'aryplusdownloader.herokuapp.com', 'localhost', '127.0.0.1'}
 
         # Verify Origin if supplied
         if origin:
             try:
                 origin_host = urllib.parse.urlparse(origin).netloc
-                if origin_host and expected_host and _clean_host(origin_host) != _clean_host(expected_host):
-                    return jsonify({'error': 'Cross-Origin forbidden: Request Origin does not match Host'}), 403
+                ch_origin = _clean_host(origin_host)
+                ch_expected = _clean_host(expected_host)
+                if ch_origin and ch_expected and ch_origin != ch_expected:
+                    if not (ch_origin in app_domains and ch_expected in app_domains):
+                        return jsonify({'error': 'Cross-Origin forbidden: Request Origin does not match Host'}), 403
             except Exception:
                 return jsonify({'error': 'Malformed Origin header'}), 403
         elif referer:
             try:
                 referer_host = urllib.parse.urlparse(referer).netloc
-                if referer_host and expected_host and _clean_host(referer_host) != _clean_host(expected_host):
-                    return jsonify({'error': 'Cross-Origin forbidden: Referer does not match Host'}), 403
+                ch_referer = _clean_host(referer_host)
+                ch_expected = _clean_host(expected_host)
+                if ch_referer and ch_expected and ch_referer != ch_expected:
+                    if not (ch_referer in app_domains and ch_expected in app_domains):
+                        return jsonify({'error': 'Cross-Origin forbidden: Referer does not match Host'}), 403
             except Exception:
                 return jsonify({'error': 'Malformed Referer header'}), 403
 
@@ -229,12 +241,11 @@ def apply_security_headers(response):
     response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=(), payment=()'
     response.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
 
-    # Granular OWASP Content-Security-Policy with Per-Request Nonce
     nonce = getattr(g, 'csp_nonce', '')
     nonce_script = f"'nonce-{nonce}' " if nonce else ""
     csp_directives = [
         "default-src 'self'",
-        f"script-src 'self' {nonce_script}'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
+        f"script-src 'self' {nonce_script}'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
         "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://cdn.jsdelivr.net",
         "font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com data:",
         "img-src 'self' data: https: blob:",

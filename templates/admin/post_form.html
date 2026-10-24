@@ -388,7 +388,7 @@
     <form id="deleteCurrentPostForm" method="POST" action="{{ url_for('admin.post_delete', post_id=post.id) }}" style="display:none;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </form>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         function confirmDeleteCurrentPost() {
             if (confirm("WARNING: Are you sure you want to permanently delete '{{ post.title|replace('\"', '\\\"') }}'? This action cannot be undone.")) {
                 document.getElementById('deleteCurrentPostForm').submit();
@@ -431,8 +431,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
-<script>
+<script nonce="{{ csp_nonce }}" src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+<script nonce="{{ csp_nonce }}">
     // Initialize Quill Editor
     const quill = new Quill('#quill-editor', {
         theme: 'snow',

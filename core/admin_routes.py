@@ -32,9 +32,17 @@ if not ADMIN_SLUG:
 
 admin_bp = Blueprint('admin', __name__, url_prefix=f'/{ADMIN_SLUG}')
 
+ADMIN_LAST_SCHEDULED_CHECK = 0
+
 @admin_bp.before_request
 def check_scheduled():
-    """Checks and updates any scheduled articles before admin operations."""
+    """Checks and updates any scheduled articles before admin operations (throttled to 60s)."""
+    global ADMIN_LAST_SCHEDULED_CHECK
+    import time
+    now = time.time()
+    if now - ADMIN_LAST_SCHEDULED_CHECK < 60:
+        return
+    ADMIN_LAST_SCHEDULED_CHECK = now
     try:
         check_and_publish_scheduled()
     except Exception:
