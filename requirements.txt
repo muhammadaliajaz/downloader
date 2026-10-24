@@ -8,3 +8,5 @@ curl-cffi>=0.7.0
 gunicorn>=21.2.0
 psycopg2-binary>=2.9.9
 python-dotenv>=1.0.0
+qrcode>=8.0
+pillow>=10.0.0

@@ -287,10 +287,13 @@ def get_db_connection():
     - Otherwise -> Local SQLite connection with Row factory.
     """
     if is_postgres_enabled():
-        import psycopg2
-        params = _parse_postgres_connection_params(get_database_url())
-        raw_conn = psycopg2.connect(**params)
-        return PostgresConnectionWrapper(raw_conn)
+        try:
+            import psycopg2
+            params = _parse_postgres_connection_params(get_database_url())
+            raw_conn = psycopg2.connect(**params)
+            return PostgresConnectionWrapper(raw_conn)
+        except Exception as e:
+            print(f"[DATABASE NOTICE] PostgreSQL connection failed: {e}. Falling back to SQLite.", flush=True)
 
     # Local SQLite Fallback
     db_path = os.environ.get('CMS_DB_PATH') or DB_PATH

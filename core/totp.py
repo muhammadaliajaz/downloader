@@ -6,7 +6,6 @@ import base64
 import secrets
 import json
 import io
-import qrcode
 import urllib.parse
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -67,20 +66,25 @@ def generate_qr_code_data_uri(secret_b32: str, username: str = "", issuer: str =
     
     # Standard RFC 6238 Key URI format (Google Authenticator / Authy / Microsoft Authenticator)
     otp_uri = f"otpauth://totp/{issuer_clean}:{user_clean}?secret={secret_clean}&issuer={issuer_clean}&algorithm=SHA1&digits=6&period=30"
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_M,
-        box_size=5,
-        border=2,
-    )
-    qr.add_data(otp_uri)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="#102421", back_color="#ffffff")
-    
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    b64_str = base64.b64encode(buf.getvalue()).decode('utf-8')
-    return f"data:image/png;base64,{b64_str}"
+    try:
+        import qrcode
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=5,
+            border=2,
+        )
+        qr.add_data(otp_uri)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="#102421", back_color="#ffffff")
+        
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        b64_str = base64.b64encode(buf.getvalue()).decode('utf-8')
+        return f"data:image/png;base64,{b64_str}"
+    except Exception as e:
+        # Graceful fallback: return empty string so 2FA page still works and shows manual secret key
+        return ""
 
 def generate_backup_scratch_codes(count=8):
     """
