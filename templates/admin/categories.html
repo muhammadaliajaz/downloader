@@ -1,0 +1,135 @@
+{% extends "admin/base.html" %}
+
+{% set active_page = 'categories' %}
+{% block page_title %}Categories Management{% endblock %}
+
+{% block content %}
+<!-- Elevated SaaS App Sheet -->
+<div class="cms-sheet">
+
+    <!-- Top Sheet Header -->
+    <div class="cms-sheet-header">
+        <div class="cms-title-wrap">
+            <div class="brand-icon" style="width: 44px; height: 44px; font-size: 18px; border-radius: 12px;">
+                <i class="fa-solid fa-folder-tree"></i>
+            </div>
+            <div>
+                <h1 class="cms-title">Categories & Taxonomy</h1>
+            </div>
+        </div>
+
+        <div class="cms-actions-group">
+            <a href="{{ url_for('admin.post_new') }}" class="btn-dark-pill">
+                <i class="fa-solid fa-plus"></i>
+                <span>Write Article</span>
+            </a>
+
+            <a href="{{ url_for('blog.index') }}" target="_blank" class="btn-white-pill">
+                <i class="fa-solid fa-arrow-up-right-from-square" style="color: var(--admin-text-muted);"></i>
+                <span>Preview Blog</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Split Grid: Add Form + Categories Table -->
+    <div style="padding: 28px 32px 32px;">
+        <div class="admin-split-grid">
+            <!-- Add Category Form -->
+            <div class="form-card">
+                <div class="form-card-title">
+                    <i class="fa-solid fa-folder-plus" style="color: var(--admin-primary);"></i>
+                    <span>Add New Category</span>
+                </div>
+
+                <form method="POST" action="{{ url_for('admin.categories') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="form-group">
+                        <label class="form-label" for="name">Category Name *</label>
+                        <input type="text" id="name" name="name" class="form-input" required placeholder="e.g. Video Tutorials">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="slug">Slug (Optional)</label>
+                        <input type="text" id="slug" name="slug" class="form-input" placeholder="video-tutorials">
+                        <div style="font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 4px;">URL-friendly version. Auto-generated if left empty.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="description">Description</label>
+                        <textarea id="description" name="description" rows="3" class="form-textarea" placeholder="Brief summary displayed on category archive page..."></textarea>
+                    </div>
+
+                    <button type="submit" class="btn-dark-pill" style="width: 100%; justify-content: center; padding: 12px; font-size: 0.95rem;">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Create Category</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Category List Table -->
+            <div class="nested-card" style="margin: 0; padding: 0; overflow: hidden;">
+                <div class="nested-card-title" style="padding: 18px 24px 14px;">
+                    <span class="badge-circle-num">{{ categories|length }}</span>
+                    <span>Existing Categories</span>
+                </div>
+
+                {% if categories %}
+                    <div class="table-responsive">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Slug</th>
+                                    <th>Articles</th>
+                                    <th style="text-align: right; min-width: 100px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cat in categories %}
+                                    <tr>
+                                        <td>
+                                            <strong style="color: var(--admin-text-main); font-size: 0.95rem;">{{ cat.name }}</strong>
+                                            {% if cat.description %}
+                                                <div style="color: var(--admin-text-muted); font-size: 0.78rem; margin-top: 3px;">{{ cat.description }}</div>
+                                            {% endif %}
+                                        </td>
+                                        <td style="color: var(--admin-text-muted); font-size: 0.85rem; font-family: monospace;">
+                                            /category/{{ cat.slug }}
+                                        </td>
+                                        <td>
+                                            <span class="badge-pill green">
+                                                {{ cat.post_count }} posts
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="action-btns" style="justify-content: flex-end;">
+                                                <a href="{{ url_for('blog.category_archive', slug=cat.slug) }}" target="_blank" class="btn-icon" title="View Public Archive">
+                                                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                                </a>
+
+                                                <form method="POST" action="{{ url_for('admin.category_delete', cat_id=cat.id) }}" style="display:inline;" onsubmit="return confirm('Delete this category? Existing articles will remain and become uncategorized.');">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <button type="submit" class="btn-icon danger" title="Delete Category">
+                                                        <i class="fa-solid fa-trash-can"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div style="padding: 48px 24px; text-align: center; color: var(--admin-text-muted);">
+                        <i class="fa-solid fa-folder-open" style="font-size: 36px; margin-bottom: 12px; opacity: 0.4;"></i>
+                        <p style="font-size: 0.95rem;">No categories created yet. Add one using the form on the left.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

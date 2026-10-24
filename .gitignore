@@ -42,10 +42,25 @@ scratch/
 tmp/
 *.log
 
-# Environment Variables & Secrets
+# CMS Database & Uploads
+data/*.db
+data/*.db-wal
+data/*.db-shm
+*.db
+!data/.gitkeep
+static/uploads/*
+!static/uploads/.gitkeep
+
+# Environment Variables, Secrets & Cookies
 .env
 .env.*
 !.env.example
+.secret_key
+data/.secret_key
+*cookies*.txt
+cookies.txt
+www.youtube.com_cookies.txt
+!cookies.example.txt
 
 # IDEs and Editors
 .vscode/

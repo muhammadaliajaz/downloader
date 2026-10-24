@@ -1,0 +1,50 @@
+{% extends "blog/base.html" %}
+
+{% block title %}About Us | Stellar Studio & Video Downloader{% endblock %}
+{% block meta_description %}Learn more about Stellar Studio, our mission, 4K parallel stream video downloading technology, and high-performance media tools.{% endblock %}
+
+{% block content %}
+<div class="blog-container">
+    <div class="static-page-wrap">
+        <nav class="breadcrumbs" aria-label="Breadcrumb" style="margin-bottom: 24px;">
+            <a href="{{ url_for('index') }}"><i class="fa-solid fa-house"></i> Home</a>
+            <span>/</span>
+            <span style="color: var(--accent-mint);">About Us</span>
+        </nav>
+
+        <h1>About Stellar Studio</h1>
+        <p style="font-size: 1.15rem; color: var(--accent-mint); font-weight: 600; margin-bottom: 24px;">
+            Pioneering high-speed media link extraction, free 4K downloading, and open technical education.
+        </p>
+
+        <p>
+            Welcome to <strong>Stellar Studio</strong>, an advanced web-based multimedia utility and technology publication platform. Our mission is to provide internet users worldwide with lightning-fast, secure, and privacy-respecting video and audio extraction tools without requiring account registration, software installation, or invasive trackers.
+        </p>
+
+        <h3 style="color: #ffffff; font-family: var(--font-display); font-size: 1.4rem; margin: 32px 0 16px;">
+            <i class="fa-solid fa-bolt" style="color: var(--accent-mint);"></i> What Sets Us Apart
+        </h3>
+        <ul style="color: #e5f1ec; margin-left: 20px; display: flex; flex-direction: column; gap: 12px;">
+            <li><strong>Zero Cost & No Subscriptions:</strong> Free access to high-definition video downloading and MP3 conversion.</li>
+            <li><strong>Sub-Second CDN Streaming:</strong> Direct integration with high-speed content delivery networks, bypassing artificial buffering and multi-fragment delays.</li>
+            <li><strong>Broad Platform Compatibility:</strong> Specialized support for ARY Plus television dramas, YouTube, TikTok watermark-free downloads, Facebook, and Instagram reels.</li>
+            <li><strong>Privacy First:</strong> Downloaded files are automatically purged from our servers within minutes to maintain strict privacy standards.</li>
+        </ul>
+
+        <h3 style="color: #ffffff; font-family: var(--font-display); font-size: 1.4rem; margin: 32px 0 16px;">
+            <i class="fa-solid fa-book-open" style="color: var(--accent-mint);"></i> Our Blog & Knowledge Hub
+        </h3>
+        <p>
+            In addition to our link extraction engine, the <strong>Stellar Tech Blog</strong> publishes in-depth how-to guides, troubleshooting articles for common streaming barriers, and insights into media compression and digital rights formats.
+        </p>
+
+        <div style="margin-top: 36px; padding: 24px; background: var(--bg-deep); border-radius: var(--radius-md); border: 1px solid var(--border-forest); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+            <div>
+                <h4 style="color: #ffffff; font-size: 1.1rem; margin-bottom: 4px;">Have questions or feedback?</h4>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">Our engineering team is always eager to hear from users.</p>
+            </div>
+            <a href="{{ url_for('blog.contact_page') }}" class="btn-primary" style="margin-top: 0;">Get in Touch</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,124 @@
+{% extends "admin/base.html" %}
+
+{% set active_page = 'tags' %}
+{% block page_title %}Tags Management{% endblock %}
+
+{% block content %}
+<!-- Elevated SaaS App Sheet -->
+<div class="cms-sheet">
+
+    <!-- Top Sheet Header -->
+    <div class="cms-sheet-header">
+        <div class="cms-title-wrap">
+            <div class="brand-icon" style="width: 44px; height: 44px; font-size: 18px; border-radius: 12px;">
+                <i class="fa-solid fa-tags"></i>
+            </div>
+            <div>
+                <h1 class="cms-title">Tags & Keywords</h1>
+            </div>
+        </div>
+
+        <div class="cms-actions-group">
+            <a href="{{ url_for('admin.post_new') }}" class="btn-dark-pill">
+                <i class="fa-solid fa-plus"></i>
+                <span>Write Article</span>
+            </a>
+
+            <a href="{{ url_for('blog.index') }}" target="_blank" class="btn-white-pill">
+                <i class="fa-solid fa-arrow-up-right-from-square" style="color: var(--admin-text-muted);"></i>
+                <span>Preview Blog</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Split Grid: Add Form + Tags Table -->
+    <div style="padding: 28px 32px 32px;">
+        <div class="admin-split-grid">
+            <!-- Add Tag Form -->
+            <div class="form-card">
+                <div class="form-card-title">
+                    <i class="fa-solid fa-tag" style="color: var(--admin-primary);"></i>
+                    <span>Add New Tag</span>
+                </div>
+
+                <form method="POST" action="{{ url_for('admin.tags') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="form-group">
+                        <label class="form-label" for="name">Tag Name *</label>
+                        <input type="text" id="name" name="name" class="form-input" required placeholder="e.g. YouTube 4K">
+                        <div style="font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 5px;">Tags can also be automatically added while writing an article.</div>
+                    </div>
+
+                    <button type="submit" class="btn-dark-pill" style="width: 100%; justify-content: center; padding: 12px; font-size: 0.95rem;">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Add Tag</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Tags List Table -->
+            <div class="nested-card" style="margin: 0; padding: 0; overflow: hidden;">
+                <div class="nested-card-title" style="padding: 18px 24px 14px;">
+                    <span class="badge-circle-num">{{ tags|length }}</span>
+                    <span>Existing Tags</span>
+                </div>
+
+                {% if tags %}
+                    <div class="table-responsive">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Tag Name</th>
+                                    <th>Slug</th>
+                                    <th>Tagged Articles</th>
+                                    <th style="text-align: right; min-width: 100px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tag in tags %}
+                                    <tr>
+                                        <td>
+                                            <strong style="color: var(--admin-text-main); font-size: 0.95rem; display: inline-flex; align-items: center; gap: 6px;">
+                                                <i class="fa-solid fa-hashtag" style="color: var(--admin-primary); font-size: 11px;"></i> {{ tag.name }}
+                                            </strong>
+                                        </td>
+                                        <td style="color: var(--admin-text-muted); font-size: 0.85rem; font-family: monospace;">
+                                            /tag/{{ tag.slug }}
+                                        </td>
+                                        <td>
+                                            <span class="badge-pill green">
+                                                {{ tag.post_count }} posts
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="action-btns" style="justify-content: flex-end;">
+                                                <a href="{{ url_for('blog.tag_archive', slug=tag.slug) }}" target="_blank" class="btn-icon" title="View Public Tag Archive">
+                                                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                                </a>
+
+                                                <form method="POST" action="{{ url_for('admin.tag_delete', tag_id=tag.id) }}" style="display:inline;" onsubmit="return confirm('Delete this tag? Articles with this tag will not be deleted.');">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <button type="submit" class="btn-icon danger" title="Delete Tag">
+                                                        <i class="fa-solid fa-trash-can"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div style="padding: 48px 24px; text-align: center; color: var(--admin-text-muted);">
+                        <i class="fa-solid fa-tags" style="font-size: 36px; margin-bottom: 12px; opacity: 0.4;"></i>
+                        <p style="font-size: 0.95rem;">No tags created yet. Tags will appear here as you tag articles.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

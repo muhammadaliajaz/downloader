@@ -1,0 +1,211 @@
+{% extends "admin/base.html" %}
+
+{% set active_page = 'settings' %}
+{% block page_title %}Website Settings{% endblock %}
+
+{% block content %}
+<!-- Elevated SaaS App Sheet -->
+<div class="cms-sheet">
+
+    <!-- Top Sheet Header -->
+    <div class="cms-sheet-header">
+        <div class="cms-title-wrap">
+            <div class="brand-icon" style="width: 44px; height: 44px; font-size: 18px; border-radius: 12px; background: #1c3328; color: #a3e635; border: 1px solid rgba(163, 230, 53, 0.3);">
+                <i class="fa-solid fa-sliders"></i>
+            </div>
+            <div>
+                <h1 class="cms-title">Platform & Website Settings</h1>
+            </div>
+        </div>
+
+        <div class="cms-actions-group">
+            <button type="button" class="btn-dark-pill" onclick="document.getElementById('settingsForm').submit()">
+                <i class="fa-solid fa-floppy-disk" style="color: #a3e635 !important;"></i>
+                <span style="color: #ffffff !important;">Save Settings</span>
+            </button>
+
+            <a href="{{ url_for('blog.index') }}" target="_blank" class="btn-white-pill" style="color: #111827 !important; font-weight: 700;">
+                <i class="fa-solid fa-arrow-up-right-from-square" style="color: var(--admin-text-muted);"></i>
+                <span>Preview Site</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Segmented Navigation Tab Bar -->
+    <div class="cms-tabs-bar" id="settingsTabsBar">
+        <button type="button" class="cms-tab-btn active" onclick="switchSettingsTab('branding')" data-tab="branding">
+            <i class="fa-solid fa-sliders"></i>
+            <span>Platform Branding</span>
+        </button>
+
+        <button type="button" class="cms-tab-btn" onclick="switchSettingsTab('blog')" data-tab="blog">
+            <i class="fa-solid fa-newspaper"></i>
+            <span>Blog Preferences</span>
+        </button>
+
+        <button type="button" class="cms-tab-btn" onclick="switchSettingsTab('social')" data-tab="social">
+            <i class="fa-solid fa-share-nodes"></i>
+            <span>Social Media Channels</span>
+        </button>
+    </div>
+
+    <!-- Settings Content Area -->
+    <div class="cms-sheet-body">
+        <form id="settingsForm" method="POST" action="{{ url_for('admin.settings') }}" style="width: 100%; max-width: 100%;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <!-- TAB 1: General Settings Card -->
+            <div id="panel-branding" class="cms-tab-panel active">
+                <div class="form-card" style="margin-bottom: 24px;">
+                    <div class="form-card-title">
+                        <i class="fa-solid fa-sliders" style="color: var(--admin-primary);"></i>
+                        <span>General Platform Branding</span>
+                    </div>
+
+                    <div class="form-row-2col">
+                        <div class="form-group">
+                            <label class="form-label" for="site_title">Site Title *</label>
+                            <input type="text" id="site_title" name="site_title" value="{{ settings.site_title or 'Stellar Studio' }}" class="form-input" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="site_tagline">Site Tagline</label>
+                            <input type="text" id="site_tagline" name="site_tagline" value="{{ settings.site_tagline or 'Next-Gen Video Downloader & Media Hub' }}" class="form-input">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="site_url">Canonical Website URL *</label>
+                        <input type="url" id="site_url" name="site_url" value="{{ settings.site_url or 'https://aryplusdownloader.tech' }}" class="form-input" required>
+                        <div style="font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 5px;">Used to generate absolute URLs in sitemaps, RSS feeds, and Open Graph tags.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="site_description">Default Meta Description</label>
+                        <textarea id="site_description" name="site_description" rows="3" class="form-textarea">{{ settings.site_description or 'Professional multi-platform video link extractor, audio converter, and high-performance media downloader.' }}</textarea>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="contact_email">Public Contact / Inquiries Email</label>
+                        <input type="email" id="contact_email" name="contact_email" value="{{ settings.contact_email or 'support@aryplusdownloader.tech' }}" class="form-input">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-dark-pill" style="padding: 13px 32px; font-size: 0.95rem; font-weight: 700;">
+                    <i class="fa-solid fa-floppy-disk" style="color: #a3e635 !important;"></i>
+                    <span style="color: #ffffff !important;">Save Website Settings</span>
+                </button>
+            </div>
+
+            <!-- TAB 2: Blog & Layout Preferences -->
+            <div id="panel-blog" class="cms-tab-panel">
+                <div class="form-card" style="margin-bottom: 24px;">
+                    <div class="form-card-title">
+                        <i class="fa-solid fa-newspaper" style="color: var(--admin-primary);"></i>
+                        <span>Blog & Reading Experience</span>
+                    </div>
+
+                    <div class="form-row-1-2">
+                        <div class="form-group">
+                            <label class="form-label" for="posts_per_page">Articles Per Page</label>
+                            <input type="number" id="posts_per_page" name="posts_per_page" value="{{ settings.posts_per_page or '9' }}" min="1" max="50" class="form-input" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="footer_copyright">Footer Copyright Text</label>
+                            <input type="text" id="footer_copyright" name="footer_copyright" value="{{ settings.footer_copyright or '© 2026 Stellar Studio. All rights reserved.' }}" class="form-input">
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-dark-pill" style="padding: 13px 32px; font-size: 0.95rem; font-weight: 700;">
+                    <i class="fa-solid fa-floppy-disk" style="color: #a3e635 !important;"></i>
+                    <span style="color: #ffffff !important;">Save Website Settings</span>
+                </button>
+            </div>
+
+            <!-- TAB 3: Social Links & Profiles -->
+            <div id="panel-social" class="cms-tab-panel">
+                <div class="form-card" style="margin-bottom: 28px;">
+                    <div class="form-card-title">
+                        <i class="fa-solid fa-share-nodes" style="color: var(--admin-primary);"></i>
+                        <span>Social Media Channels</span>
+                    </div>
+
+                    <div class="form-row-2col">
+                        <div class="form-group">
+                            <label class="form-label" for="twitter_url"><i class="fa-brands fa-x-twitter"></i> X (Twitter) URL</label>
+                            <input type="url" id="twitter_url" name="twitter_url" value="{{ settings.twitter_url or '' }}" placeholder="https://x.com/yourhandle" class="form-input">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="youtube_url"><i class="fa-brands fa-youtube"></i> YouTube Channel</label>
+                            <input type="url" id="youtube_url" name="youtube_url" value="{{ settings.youtube_url or '' }}" placeholder="https://youtube.com/@yourchannel" class="form-input">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="facebook_url"><i class="fa-brands fa-facebook"></i> Facebook Page</label>
+                            <input type="url" id="facebook_url" name="facebook_url" value="{{ settings.facebook_url or '' }}" placeholder="https://facebook.com/yourpage" class="form-input">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="instagram_url"><i class="fa-brands fa-instagram"></i> Instagram Profile</label>
+                            <input type="url" id="instagram_url" name="instagram_url" value="{{ settings.instagram_url or '' }}" placeholder="https://instagram.com/yourprofile" class="form-input">
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-dark-pill" style="padding: 13px 32px; font-size: 0.95rem; font-weight: 700;">
+                    <i class="fa-solid fa-floppy-disk" style="color: #a3e635 !important;"></i>
+                    <span style="color: #ffffff !important;">Save Website Settings</span>
+                </button>
+            </div>
+
+        </form>
+    </div>
+
+</div>
+
+<!-- Client-side Scripts for Settings Tab Switching -->
+<script>
+    function switchSettingsTab(tabName) {
+        const tabBtns = document.querySelectorAll('#settingsTabsBar .cms-tab-btn');
+        tabBtns.forEach(btn => {
+            if (btn.getAttribute('data-tab') === tabName) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+
+        const panels = document.querySelectorAll('#settingsForm .cms-tab-panel');
+        panels.forEach(panel => {
+            panel.classList.remove('active');
+        });
+
+        const activePanel = document.getElementById('panel-' + tabName);
+        if (activePanel) {
+            activePanel.classList.add('active');
+        }
+
+        try {
+            const url = new URL(window.location);
+            url.searchParams.set('tab', tabName);
+            window.history.replaceState(null, '', url.toString());
+        } catch (e) {
+            window.location.hash = tabName;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const queryTab = urlParams.get('tab');
+        const hashTab = window.location.hash.replace('#', '');
+        const targetTab = queryTab || hashTab || 'branding';
+
+        if (targetTab && document.getElementById('panel-' + targetTab)) {
+            switchSettingsTab(targetTab);
+        }
+    });
+</script>
+{% endblock %}

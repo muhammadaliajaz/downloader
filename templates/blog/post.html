@@ -1,0 +1,180 @@
+{% extends "blog/base.html" %}
+
+{% block title %}{{ article.seo_title or article.title }} | {{ site_settings.site_title }}{% endblock %}
+
+{% block meta_description %}{{ article.meta_description or article.excerpt }}{% endblock %}
+
+{% block canonical_url %}{{ article.canonical_url or request.base_url }}{% endblock %}
+
+{% block og_title %}{{ article.og_title or article.title }}{% endblock %}
+{% block og_description %}{{ article.og_description or article.excerpt }}{% endblock %}
+{% block og_image %}{{ article.og_image or article.featured_image or url_for('static', filename='img/og-default.jpg', _external=True) }}{% endblock %}
+{% block og_type %}article{% endblock %}
+
+{% block robots_meta %}
+    {% if article.is_noindex %}
+        <meta name="robots" content="noindex, nofollow">
+    {% else %}
+        <meta name="robots" content="index, follow">
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="blog-container">
+
+    <!-- Admin Preview Banner -->
+    {% if is_preview %}
+    <div style="background: rgba(251, 191, 36, 0.15); border: 1px solid var(--admin-amber); color: #fbbf24; padding: 12px 20px; border-radius: var(--radius-sm); margin: 20px 0; display: flex; align-items: center; justify-content: space-between;">
+        <div>
+            <i class="fa-solid fa-eye"></i> <strong>Admin Preview Mode:</strong> This article is currently a <strong>{{ article.status|upper }}</strong> and is not yet publicly visible.
+        </div>
+        <a href="{{ url_for('admin.post_edit', post_id=article.id) }}" style="color: #ffffff; text-decoration: underline; font-weight: 700;">Edit Article</a>
+    </div>
+    {% endif %}
+
+    <!-- Article Header -->
+    <header class="post-header">
+        <!-- Breadcrumbs -->
+        <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <a href="{{ url_for('index') }}"><i class="fa-solid fa-house"></i> Home</a>
+            <span>/</span>
+            <a href="{{ url_for('blog.blog_index') }}">Blog</a>
+            {% if article.category_name %}
+                <span>/</span>
+                <a href="{{ url_for('blog.category_archive', slug=article.category_slug) }}">{{ article.category_name }}</a>
+            {% endif %}
+            <span>/</span>
+            <span style="color: var(--accent-mint); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ article.title }}</span>
+        </nav>
+
+        <h1 class="post-headline">{{ article.title }}</h1>
+
+        <!-- Post Meta Information -->
+        <div class="post-meta-bar">
+            <div class="post-meta">
+                <div class="author-pill">
+                    <div class="author-avatar"><i class="fa-solid fa-user"></i></div>
+                    <span>{{ article.author_name }}</span>
+                </div>
+                <span class="meta-dot">•</span>
+                <span>Published on {{ (article.published_at|string).split()[0] if article.published_at else 'Draft' }}</span>
+                {% if article.updated_at and article.updated_at != article.published_at %}
+                    <span class="meta-dot">•</span>
+                    <span style="color: var(--text-dim);">(Updated: {{ (article.updated_at|string).split()[0] }})</span>
+                {% endif %}
+                <span class="meta-dot">•</span>
+                <span><i class="fa-regular fa-clock"></i> {{ article.reading_time }}</span>
+            </div>
+
+            {% if article.category_name %}
+            <a href="{{ url_for('blog.category_archive', slug=article.category_slug) }}" class="cat-pill" style="padding: 4px 14px; font-size: 0.8rem;">
+                <i class="fa-solid fa-folder-open"></i> {{ article.category_name }}
+            </a>
+            {% endif %}
+        </div>
+    </header>
+
+    <!-- Featured Hero Image -->
+    {% if article.featured_image %}
+    <div class="post-featured-hero">
+        <img src="{{ article.featured_image }}" alt="{{ article.featured_image_alt or article.title }}">
+    </div>
+    {% endif %}
+
+    <!-- Rich-Text Article Body (Sanitized) -->
+    <article class="post-content-wrap">
+        {{ article.content|safe }}
+    </article>
+
+    <!-- Post Footer (Tags & Social Share) -->
+    <footer class="post-footer-wrap">
+        {% if tags %}
+        <div class="tags-list">
+            <span style="font-weight: 700; color: var(--text-muted); font-size: 0.9rem;"><i class="fa-solid fa-tags"></i> Tags:</span>
+            {% for tag in tags %}
+                <a href="{{ url_for('blog.tag_archive', slug=tag.slug) }}" class="tag-badge">#{{ tag.name }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Social Share Bar -->
+        <div class="share-bar">
+            <div style="font-weight: 700; color: var(--text-main); font-size: 0.95rem;">
+                <i class="fa-solid fa-share-nodes"></i> Share this guide:
+            </div>
+            <div class="share-links">
+                <!-- WhatsApp -->
+                <a href="https://api.whatsapp.com/send?text={{ article.title|urlencode }}%20{{ request.base_url|urlencode }}" target="_blank" rel="noopener" class="share-btn" title="Share on WhatsApp">
+                    <i class="fa-brands fa-whatsapp"></i>
+                </a>
+                <!-- Twitter / X -->
+                <a href="https://twitter.com/intent/tweet?text={{ article.title|urlencode }}&url={{ request.base_url|urlencode }}" target="_blank" rel="noopener" class="share-btn" title="Share on X">
+                    <i class="fa-brands fa-x-twitter"></i>
+                </a>
+                <!-- Facebook -->
+                <a href="https://www.facebook.com/sharer/sharer.php?u={{ request.base_url|urlencode }}" target="_blank" rel="noopener" class="share-btn" title="Share on Facebook">
+                    <i class="fa-brands fa-facebook"></i>
+                </a>
+                <!-- Copy Link -->
+                <button type="button" onclick="copyArticleLink(this)" class="share-btn" title="Copy Link">
+                    <i class="fa-solid fa-link"></i>
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Related Articles Section -->
+    {% if related_articles %}
+    <section style="margin: 48px 0 40px;">
+        <h3 style="font-family: var(--font-display); font-size: 1.45rem; font-weight: 800; color: #ffffff; margin-bottom: 24px;">
+            Related Guides & Articles
+        </h3>
+        <div class="articles-grid">
+            {% for rel in related_articles %}
+            <article class="article-card">
+                <div class="card-thumb-wrap">
+                    {% if rel.category_name %}
+                        <span class="card-category-badge">{{ rel.category_name }}</span>
+                    {% endif %}
+                    <a href="{{ url_for('blog.article_detail', slug=rel.slug) }}">
+                        {% if rel.featured_image %}
+                            <img src="{{ rel.featured_image }}" alt="{{ rel.title }}" loading="lazy">
+                        {% else %}
+                            <img src="https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&w=800&q=80" alt="{{ rel.title }}">
+                        {% endif %}
+                    </a>
+                </div>
+                <div class="card-body">
+                    <h4 class="card-title">
+                        <a href="{{ url_for('blog.article_detail', slug=rel.slug) }}">{{ rel.title }}</a>
+                    </h4>
+                    <p class="card-excerpt">{{ rel.excerpt }}</p>
+                    <div class="card-footer">
+                        <span>{{ (rel.published_at|string).split()[0] if rel.published_at else 'Recent' }}</span>
+                        <span><i class="fa-regular fa-clock"></i> {{ rel.reading_time }}</span>
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+</div>
+
+<script>
+    function copyArticleLink(btn) {
+        navigator.clipboard.writeText(window.location.href).then(() => {
+            const icon = btn.querySelector('i');
+            icon.className = 'fa-solid fa-check';
+            icon.style.color = '#34d399';
+            setTimeout(() => {
+                icon.className = 'fa-solid fa-link';
+                icon.style.color = '';
+            }, 2000);
+        }).catch(() => {
+            prompt('Copy Article Link:', window.location.href);
+        });
+    }
+</script>
+{% endblock %}

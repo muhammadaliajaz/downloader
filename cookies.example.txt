@@ -1,0 +1,6 @@
+# Netscape HTTP Cookie File
+# http://curl.haxx.se/rfc/cookie_spec.html
+# This is a template/example file for YouTube cookies.
+# DO NOT commit real authenticated session cookies to version control!
+# To use authenticated cookies, export them from your browser to cookies.txt (gitignored)
+# or provide them via an environment variable.

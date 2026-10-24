@@ -1,0 +1,48 @@
+{% extends "blog/base.html" %}
+
+{% block title %}Privacy Policy | Stellar Studio{% endblock %}
+{% block meta_description %}Read our Privacy Policy to understand how Stellar Studio protects user data, enforces strict non-retention policies, and respects your privacy.{% endblock %}
+
+{% block content %}
+<div class="blog-container">
+    <div class="static-page-wrap">
+        <nav class="breadcrumbs" aria-label="Breadcrumb" style="margin-bottom: 24px;">
+            <a href="{{ url_for('index') }}"><i class="fa-solid fa-house"></i> Home</a>
+            <span>/</span>
+            <span style="color: var(--accent-mint);">Privacy Policy</span>
+        </nav>
+
+        <h1>Privacy Policy</h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 24px;">Last Updated: October 2026</p>
+
+        <p>
+            At <strong>Stellar Studio</strong> (accessible from <a href="{{ url_for('index') }}">aryplusdownloader.tech</a>), the privacy of our visitors is of paramount importance. This Privacy Policy document outlines the types of information that is received and collected by Stellar Studio and how it is used.
+        </p>
+
+        <h3 style="color: #ffffff; font-size: 1.3rem; margin: 28px 0 12px;">1. Information We Do Not Collect</h3>
+        <p>
+            Unlike traditional platforms, Stellar Studio does not require you to create an account, log in, or provide personal identity information (such as credit card details, full names, or home addresses) to utilize our video link downloader.
+        </p>
+
+        <h3 style="color: #ffffff; font-size: 1.3rem; margin: 28px 0 12px;">2. Temporary File Storage & Auto-Purge Policy</h3>
+        <p>
+            When a video extraction or MP3 conversion is triggered, the media is processed temporarily on high-performance servers. We implement an automated background cleanup scheduler that permanently deletes all temporary video files, audio tracks, and cached assets within <strong>180 seconds</strong> after download completion.
+        </p>
+
+        <h3 style="color: #ffffff; font-size: 1.3rem; margin: 28px 0 12px;">3. Log Files & Rate Limiting</h3>
+        <p>
+            To prevent Denial-of-Service (DoS) abuse and protect service uptime, our system tracks anonymous client IP addresses strictly in memory for temporary sliding-window rate limiting (10 requests per minute). These records are automatically discarded and are never shared with advertisers.
+        </p>
+
+        <h3 style="color: #ffffff; font-size: 1.3rem; margin: 28px 0 12px;">4. Third-Party Links</h3>
+        <p>
+            Our blog articles may contain external hyperlinks to official channels (such as YouTube, ARY Digital Asia, TikTok, and technical documentation). We encourage our users to be aware when they leave our site and to read the privacy statements of each external website.
+        </p>
+
+        <h3 style="color: #ffffff; font-size: 1.3rem; margin: 28px 0 12px;">5. Contact Us</h3>
+        <p>
+            If you have questions regarding this Privacy Policy, please reach out via our <a href="{{ url_for('blog.contact_page') }}">Contact Page</a>.
+        </p>
+    </div>
+</div>
+{% endblock %}

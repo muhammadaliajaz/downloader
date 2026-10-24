@@ -1,0 +1,102 @@
+{% extends "blog/base.html" %}
+
+{% block title %}{{ category.name }} Articles & Tutorials | Stellar Blog{% endblock %}
+{% block meta_description %}{{ category.description or 'Explore all guides and articles under ' ~ category.name ~ '.' }}{% endblock %}
+
+{% block content %}
+<div class="blog-container">
+
+    <section class="blog-hero" style="padding-bottom: 24px;">
+        <nav class="breadcrumbs" style="justify-content: center;" aria-label="Breadcrumb">
+            <a href="{{ url_for('index') }}"><i class="fa-solid fa-house"></i> Home</a>
+            <span>/</span>
+            <a href="{{ url_for('blog.blog_index') }}">Blog</a>
+            <span>/</span>
+            <span style="color: var(--accent-mint);">{{ category.name }}</span>
+        </nav>
+
+        <h1 class="hero-title" style="margin-top: 12px;">{{ category.name }}</h1>
+        <p class="hero-desc">
+            {{ category.description or 'Comprehensive guides, tutorials, and articles filed under ' ~ category.name ~ '.' }}
+        </p>
+
+        <!-- Other Categories -->
+        <div class="category-pills-scroll">
+            <a href="{{ url_for('blog.blog_index') }}" class="cat-pill">All Topics</a>
+            {% for c in all_categories %}
+                <a href="{{ url_for('blog.category_archive', slug=c.slug) }}" class="cat-pill {% if c.id == category.id %}active{% endif %}">
+                    {{ c.name }} ({{ c.post_count }})
+                </a>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Category Articles Grid -->
+    <section style="margin-top: 32px;">
+        {% if articles %}
+        <div class="articles-grid">
+            {% for article in articles %}
+            <article class="article-card">
+                <div class="card-thumb-wrap">
+                    <span class="card-category-badge">{{ category.name }}</span>
+                    <a href="{{ url_for('blog.article_detail', slug=article.slug) }}">
+                        {% if article.featured_image %}
+                            <img src="{{ article.featured_image }}" alt="{{ article.title }}" loading="lazy">
+                        {% else %}
+                            <img src="https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&w=800&q=80" alt="{{ article.title }}">
+                        {% endif %}
+                    </a>
+                </div>
+                <div class="card-body">
+                    <h3 class="card-title">
+                        <a href="{{ url_for('blog.article_detail', slug=article.slug) }}">{{ article.title }}</a>
+                    </h3>
+                    <p class="card-excerpt">{{ article.excerpt }}</p>
+                    <div class="card-footer">
+                        <div class="author-pill">
+                            <div class="author-avatar"><i class="fa-solid fa-user"></i></div>
+                            <span>{{ article.author_name }}</span>
+                        </div>
+                        <span><i class="fa-regular fa-clock"></i> {{ article.reading_time }}</span>
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <nav class="pagination-wrap" aria-label="Category Pagination">
+            {% if current_page > 1 %}
+                <a href="{{ url_for('blog.category_archive', slug=category.slug, page=current_page-1) }}" class="page-btn"><i class="fa-solid fa-chevron-left"></i></a>
+            {% else %}
+                <span class="page-btn disabled"><i class="fa-solid fa-chevron-left"></i></span>
+            {% endif %}
+
+            {% for p in range(1, total_pages + 1) %}
+                {% if p == current_page %}
+                    <span class="page-btn active">{{ p }}</span>
+                {% else %}
+                    <a href="{{ url_for('blog.category_archive', slug=category.slug, page=p) }}" class="page-btn">{{ p }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if current_page < total_pages %}
+                <a href="{{ url_for('blog.category_archive', slug=category.slug, page=current_page+1) }}" class="page-btn"><i class="fa-solid fa-chevron-right"></i></a>
+            {% else %}
+                <span class="page-btn disabled"><i class="fa-solid fa-chevron-right"></i></span>
+            {% endif %}
+        </nav>
+        {% endif %}
+
+        {% else %}
+        <div style="text-align: center; padding: 64px 20px; background: var(--bg-surface); border: 1px dashed var(--border-forest); border-radius: var(--radius-lg); margin-bottom: 48px;">
+            <div style="font-size: 40px; color: var(--text-muted); margin-bottom: 12px;"><i class="fa-solid fa-folder-open"></i></div>
+            <h3 style="color: #ffffff; font-family: var(--font-display); font-size: 1.4rem;">No articles in this category yet</h3>
+            <p style="color: var(--text-muted); margin-top: 8px;">Check back soon for new guides and articles.</p>
+        </div>
+        {% endif %}
+    </section>
+
+</div>
+{% endblock %}

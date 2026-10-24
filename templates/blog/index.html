@@ -1,0 +1,194 @@
+{% extends "blog/base.html" %}
+
+{% block title %}
+    {% if search_query %}
+        Search Results for "{{ search_query }}" | Stellar Blog
+    {% elif selected_category %}
+        {{ selected_category|replace('-', ' ')|title }} Articles | Stellar Blog
+    {% else %}
+        {{ site_settings.site_title }} | Tech Guides, Video Tutorials & Insights
+    {% endif %}
+{% endblock %}
+
+{% block meta_description %}{{ site_settings.site_description }}{% endblock %}
+
+{% block content %}
+<div class="blog-container">
+
+    <!-- Hero Section -->
+    <section class="blog-hero">
+        <div class="hero-tagline">
+            <i class="fa-solid fa-sparkles"></i> Knowledge Hub & Media Guides
+        </div>
+        <h1 class="hero-title">Insights, Tutorials & Updates</h1>
+        <p class="hero-desc">
+            Explore step-by-step guides on downloading 4K videos, drama series streaming tips, and media technology insights.
+        </p>
+
+        <!-- Search Form (Photo 1 Style Pill) -->
+        <form action="{{ url_for('blog.blog_index') }}" method="GET" class="search-pill-bar">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" name="q" class="search-pill-input" placeholder="Search guides, tutorials, or drama tips..." value="{{ search_query }}">
+            {% if selected_category %}
+                <input type="hidden" name="category" value="{{ selected_category }}">
+            {% endif %}
+            <button type="submit" class="btn-pill-search">
+                <span>Search</span>
+                <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </form>
+
+        <!-- Category Pills Filter (Swipeable on Mobile) -->
+        <div class="category-pills-scroll">
+            <a href="{{ url_for('blog.blog_index', q=search_query) }}" class="cat-pill {% if not selected_category %}active{% endif %}">
+                All Topics
+            </a>
+            {% for cat in categories %}
+                <a href="{{ url_for('blog.blog_index', category=cat.slug, q=search_query) }}" class="cat-pill {% if selected_category == cat.slug %}active{% endif %}">
+                    {{ cat.name }} ({{ cat.post_count }})
+                </a>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Featured Hero Article (Only on Page 1 without active search) -->
+    {% if featured_post and current_page == 1 and not search_query and not selected_category %}
+    <article class="featured-card">
+        <div class="featured-img-wrap">
+            {% if featured_post.featured_image %}
+                <img src="{{ featured_post.featured_image }}" alt="{{ featured_post.featured_image_alt or featured_post.title }}" loading="lazy">
+            {% else %}
+                <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80" alt="Featured Article Thumbnail">
+            {% endif %}
+        </div>
+        <div class="featured-content">
+            <div class="badge-featured">
+                <i class="fa-solid fa-star"></i> Featured Guide
+            </div>
+            <h2 class="featured-title">
+                <a href="{{ url_for('blog.article_detail', slug=featured_post.slug) }}">
+                    {{ featured_post.title }}
+                </a>
+            </h2>
+            <p class="featured-excerpt">
+                {{ featured_post.excerpt }}
+            </p>
+            <div class="post-meta">
+                <div class="author-pill">
+                    <div class="author-avatar"><i class="fa-solid fa-user"></i></div>
+                    {{ featured_post.author_name }}
+                </div>
+                <span class="meta-dot">•</span>
+                <span>{{ (featured_post.published_at|string).split()[0] if featured_post.published_at else 'Recent' }}</span>
+                <span class="meta-dot">•</span>
+                <span><i class="fa-regular fa-clock"></i> {{ featured_post.reading_time }}</span>
+            </div>
+        </div>
+    </article>
+    {% endif %}
+
+    <!-- Articles Section -->
+    <section>
+        {% if search_query or selected_category %}
+        <div style="margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between;">
+            <h3 style="font-family: var(--font-display); font-size: 1.3rem; color: #ffffff;">
+                Found {{ total_articles }} article{{ 's' if total_articles != 1 else '' }}
+                {% if search_query %} for "{{ search_query }}"{% endif %}
+                {% if selected_category %} in {{ selected_category|replace('-', ' ')|title }}{% endif %}
+            </h3>
+            <a href="{{ url_for('blog.blog_index') }}" style="color: var(--accent-mint); font-size: 0.9rem; text-decoration: none;">
+                Clear filter <i class="fa-solid fa-xmark"></i>
+            </a>
+        </div>
+        {% endif %}
+
+        {% if articles %}
+        <div class="articles-grid">
+            {% for article in articles %}
+                {# If this article was shown as featured, skip it on first page grid #}
+                {% if not (featured_post and current_page == 1 and not search_query and not selected_category and article.id == featured_post.id) %}
+                <article class="article-card">
+                    <div class="card-thumb-wrap">
+                        {% if article.category_name %}
+                            <span class="card-category-badge">{{ article.category_name }}</span>
+                        {% endif %}
+                        <a href="{{ url_for('blog.article_detail', slug=article.slug) }}">
+                            {% if article.featured_image %}
+                                <img src="{{ article.featured_image }}" alt="{{ article.featured_image_alt or article.title }}" loading="lazy">
+                            {% else %}
+                                <img src="https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&w=800&q=80" alt="{{ article.title }}">
+                            {% endif %}
+                        </a>
+                    </div>
+                    <div class="card-body">
+                        <h3 class="card-title">
+                            <a href="{{ url_for('blog.article_detail', slug=article.slug) }}">
+                                {{ article.title }}
+                            </a>
+                        </h3>
+                        <p class="card-excerpt">
+                            {{ article.excerpt }}
+                        </p>
+                        <div class="card-footer">
+                            <div class="author-pill">
+                                <div class="author-avatar"><i class="fa-solid fa-user"></i></div>
+                                <span>{{ article.author_name }}</span>
+                            </div>
+                            <span><i class="fa-regular fa-clock"></i> {{ article.reading_time }}</span>
+                        </div>
+                    </div>
+                </article>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        <!-- Pagination Controls -->
+        {% if total_pages > 1 %}
+        <nav class="pagination-wrap" aria-label="Articles Pagination">
+            {% if current_page > 1 %}
+                <a href="{{ url_for('blog.blog_index', page=current_page-1, q=search_query, category=selected_category) }}" class="page-btn">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </a>
+            {% else %}
+                <span class="page-btn disabled"><i class="fa-solid fa-chevron-left"></i></span>
+            {% endif %}
+
+            {% for p in range(1, total_pages + 1) %}
+                {% if p == current_page %}
+                    <span class="page-btn active">{{ p }}</span>
+                {% elif p <= 3 or p >= total_pages - 1 or (p >= current_page - 1 and p <= current_page + 1) %}
+                    <a href="{{ url_for('blog.blog_index', page=p, q=search_query, category=selected_category) }}" class="page-btn">{{ p }}</a>
+                {% elif p == 4 and current_page > 4 %}
+                    <span class="page-btn disabled">...</span>
+                {% endif %}
+            {% endfor %}
+
+            {% if current_page < total_pages %}
+                <a href="{{ url_for('blog.blog_index', page=current_page+1, q=search_query, category=selected_category) }}" class="page-btn">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </a>
+            {% else %}
+                <span class="page-btn disabled"><i class="fa-solid fa-chevron-right"></i></span>
+            {% endif %}
+        </nav>
+        {% endif %}
+
+        {% else %}
+        <!-- Empty State -->
+        <div style="text-align: center; padding: 64px 20px; background: var(--bg-surface); border: 1px dashed var(--border-forest); border-radius: var(--radius-lg); margin-bottom: 48px;">
+            <div style="font-size: 48px; color: var(--text-muted); margin-bottom: 16px;"><i class="fa-solid fa-newspaper"></i></div>
+            <h3 style="font-family: var(--font-display); font-size: 1.5rem; color: #ffffff; margin-bottom: 8px;">No Articles Found</h3>
+            <p style="color: var(--text-muted); max-width: 460px; margin: 0 auto 24px;">
+                {% if search_query %}
+                    No articles matched your search query "{{ search_query }}". Try checking for spelling errors or searching with broader keywords.
+                {% else %}
+                    New guides and updates are currently being drafted. Check back soon!
+                {% endif %}
+            </p>
+            <a href="{{ url_for('blog.blog_index') }}" class="btn-primary">View All Guides</a>
+        </div>
+        {% endif %}
+    </section>
+
+</div>
+{% endblock %}

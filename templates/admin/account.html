@@ -1,0 +1,594 @@
+{% extends "admin/base.html" %}
+
+{% set active_page = 'account' %}
+{% block page_title %}Account & Security{% endblock %}
+
+{% block content %}
+<!-- Elevated SaaS App Sheet -->
+<div class="cms-sheet">
+
+    <!-- Top Sheet Header -->
+    <div class="cms-sheet-header">
+        <div class="cms-title-wrap">
+            <div class="brand-icon" style="width: 44px; height: 44px; font-size: 18px; border-radius: 12px; background: #1c3328; color: #a3e635; border: 1px solid rgba(163, 230, 53, 0.3);">
+                <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <div>
+                <h1 class="cms-title">Account & System Security</h1>
+            </div>
+        </div>
+
+        <div class="cms-actions-group">
+            <a href="{{ url_for('admin.database_backup') }}" class="btn-white-pill" title="Download full SQLite database snapshot (.db)" style="color: #111827 !important; font-weight: 700;">
+                <i class="fa-solid fa-database" style="color: #059669;"></i>
+                <span>Backup Database</span>
+            </a>
+            <a href="{{ url_for('admin.settings') }}" class="btn-white-pill" style="color: #111827 !important; font-weight: 700;">
+                <i class="fa-solid fa-sliders" style="color: var(--admin-text-muted);"></i>
+                <span>Platform Settings</span>
+            </a>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn-dark-pill">
+                <i class="fa-solid fa-chart-pie" style="color: #a3e635 !important;"></i>
+                <span style="color: #ffffff !important;">Dashboard</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Segmented Navigation Tab Bar -->
+    <div class="cms-tabs-bar" id="accountTabsBar">
+        <button type="button" class="cms-tab-btn {% if active_tab == 'profile' %}active{% endif %}" onclick="switchAccountTab('profile')" data-tab="profile">
+            <i class="fa-solid fa-id-card"></i>
+            <span>Admin Profile</span>
+        </button>
+
+        <button type="button" class="cms-tab-btn {% if active_tab == 'password' %}active{% endif %}" onclick="switchAccountTab('password')" data-tab="password">
+            <i class="fa-solid fa-key"></i>
+            <span>Password & Access</span>
+        </button>
+
+        <button type="button" class="cms-tab-btn {% if active_tab == '2fa' %}active{% endif %}" onclick="switchAccountTab('2fa')" data-tab="2fa">
+            <i class="fa-solid fa-mobile-screen-button"></i>
+            <span>Two-Factor (2FA)</span>
+            {% if current_user.mfa_enabled %}
+                <span class="badge-pill green" style="font-size: 0.68rem; padding: 2px 7px;">Active</span>
+            {% else %}
+                <span class="badge-pill amber" style="font-size: 0.68rem; padding: 2px 7px;">Off</span>
+            {% endif %}
+        </button>
+
+        <button type="button" class="cms-tab-btn {% if active_tab == 'recovery' %}active{% endif %}" onclick="switchAccountTab('recovery')" data-tab="recovery">
+            <i class="fa-solid fa-database"></i>
+            <span>Backup & Recovery</span>
+        </button>
+
+        <button type="button" class="cms-tab-btn {% if active_tab == 'audit' %}active{% endif %}" onclick="switchAccountTab('audit')" data-tab="audit">
+            <i class="fa-solid fa-clipboard-list"></i>
+            <span>Audit Trail</span>
+            <span class="badge-pill" style="background: rgba(0,0,0,0.06); color: var(--admin-text-main); font-size: 0.68rem; padding: 2px 7px;">{{ audit_logs|length }}</span>
+        </button>
+    </div>
+
+    <!-- Tab Panels Container -->
+    <div class="cms-sheet-body">
+
+        <!-- ========================================== -->
+        <!-- TAB 1: ADMIN PROFILE -->
+        <!-- ========================================== -->
+        <div id="panel-profile" class="cms-tab-panel {% if active_tab == 'profile' %}active{% endif %}">
+            <div style="max-width: 100%;">
+                <div class="form-card">
+                    <div class="form-card-title">
+                        <i class="fa-solid fa-id-card" style="color: var(--admin-primary);"></i>
+                        <span>Admin Profile Information</span>
+                    </div>
+
+                    <form method="POST" action="{{ url_for('admin.account', tab='profile') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="action" value="update_profile">
+
+                        <div class="form-row-2col">
+                            <div class="form-group">
+                                <label class="form-label" for="username">Username *</label>
+                                <input type="text" id="username" name="username" value="{{ current_user.username }}" class="form-input" required minlength="3">
+                                <div style="font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 5px;">Unique login handle for dashboard authentication.</div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="display_name">Public Display Name *</label>
+                                <input type="text" id="display_name" name="display_name" value="{{ current_user.display_name or current_user.username }}" class="form-input" required>
+                                <div style="font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 5px;">Displayed as the author name on published articles.</div>
+                            </div>
+                        </div>
+
+                        <div class="form-row-2col">
+                            <div class="form-group">
+                                <label class="form-label" for="email">Email Address *</label>
+                                <input type="email" id="email" name="email" value="{{ current_user.email }}" class="form-input" required>
+                                <div style="font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 5px;">Used for notifications and account recovery.</div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Assigned Role</label>
+                                <div style="padding: 10px 14px; background: rgba(0,0,0,0.02); border: 1px solid var(--admin-border); border-radius: 10px; color: var(--admin-text-body); font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; justify-content: space-between;">
+                                    <span><i class="fa-solid fa-shield" style="color: var(--admin-primary); margin-right: 8px;"></i> {{ current_user.role|capitalize }}</span>
+                                    <span style="font-size: 0.75rem; color: var(--admin-text-muted);">Root Privileges</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn-dark-pill" style="padding: 12px 28px; font-weight: 700; font-size: 0.95rem; margin-top: 8px;">
+                            <i class="fa-solid fa-floppy-disk" style="color: #a3e635 !important;"></i>
+                            <span style="color: #ffffff !important;">Save Profile Changes</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 2: CHANGE PASSWORD -->
+        <!-- ========================================== -->
+        <div id="panel-password" class="cms-tab-panel {% if active_tab == 'password' %}active{% endif %}">
+            <div style="max-width: 100%;">
+                <div class="form-card">
+                    <div class="form-card-title">
+                        <i class="fa-solid fa-key" style="color: var(--admin-primary);"></i>
+                        <span>Change Account Password</span>
+                    </div>
+
+                    <form method="POST" action="{{ url_for('admin.account', tab='password') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="action" value="change_password">
+
+                        <div class="form-group">
+                            <label class="form-label" for="current_password">Current Password *</label>
+                            <input type="password" id="current_password" name="current_password" class="form-input" required placeholder="Enter your active password">
+                        </div>
+
+                        <div class="form-row-2col">
+                            <div class="form-group">
+                                <label class="form-label" for="new_password">New Password *</label>
+                                <input type="password" id="new_password" name="new_password" class="form-input" required minlength="8" placeholder="Minimum 8 characters">
+                                <div style="font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 5px;">Must contain letters and numbers or symbols.</div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="confirm_password">Confirm New Password *</label>
+                                <input type="password" id="confirm_password" name="confirm_password" class="form-input" required minlength="8" placeholder="Re-type new password">
+                            </div>
+                        </div>
+
+                        <div style="padding: 12px 14px; background: #ecfdf5; border: 1px solid #10b981; border-radius: 10px; margin-bottom: 22px;">
+                            <div style="font-size: 0.82rem; color: #065f46; font-weight: 700; margin-bottom: 3px;">
+                                <i class="fa-solid fa-shield-halved"></i> Session Revocation Security
+                            </div>
+                            <div style="font-size: 0.75rem; color: #047857; line-height: 1.4;">
+                                Updating your password automatically invalidates active security tokens and logs out any other open sessions across other devices.
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn-dark-pill" style="padding: 12px 28px; font-weight: 700; font-size: 0.95rem;">
+                            <i class="fa-solid fa-lock" style="color: #a3e635 !important;"></i>
+                            <span style="color: #ffffff !important;">Update Password & Revoke Sessions</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 3: TWO-FACTOR AUTHENTICATION (2FA) -->
+        <!-- ========================================== -->
+        <div id="panel-2fa" class="cms-tab-panel {% if active_tab == '2fa' %}active{% endif %}">
+            <div style="max-width: 100%;">
+
+                <!-- 1. Emergency Backup Codes Alert (Displayed right after enabling 2FA) -->
+                {% if generated_backup_codes %}
+                    <div style="padding: 24px; background: #ecfdf5; border: 2px solid #059669; border-radius: 16px; margin-bottom: 26px; box-shadow: 0 4px 16px rgba(5, 150, 105, 0.08);">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 12px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div style="width: 38px; height: 38px; border-radius: 10px; background: #059669; color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                                    <i class="fa-solid fa-shield-check"></i>
+                                </div>
+                                <div>
+                                    <h3 style="font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: #064e3b; margin: 0;">Emergency 2FA Single-Use Backup Codes</h3>
+                                    <p style="font-size: 0.82rem; color: #047857; margin: 2px 0 0;">Each code can be used exactly once if your phone or authenticator app is unavailable.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Crisp High-Contrast Codes Grid -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 16px 0;">
+                            {% for bcode in generated_backup_codes %}
+                                <div style="background: #ffffff; padding: 12px 14px; border-radius: 10px; border: 1.5px solid #10b981; font-family: var(--font-mono, monospace); font-weight: 800; font-size: 1.15rem; text-align: center; color: #065f46; letter-spacing: 1.5px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05); user-select: all;">
+                                    {{ bcode }}
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Action Buttons: Download .txt and Copy All -->
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px;">
+                            <button type="button" onclick="downloadBackupCodes()" class="btn-dark-pill" style="padding: 10px 22px; font-size: 0.88rem; font-weight: 700;">
+                                <i class="fa-solid fa-file-arrow-down" style="color: #a3e635 !important;"></i>
+                                <span style="color: #ffffff !important;">Download Codes (.txt)</span>
+                            </button>
+                            <button type="button" onclick="copyAllBackupCodes()" class="btn-white-pill" style="padding: 10px 18px; font-size: 0.88rem; font-weight: 700; color: #111827 !important; border: 1.5px solid #d1d5db;">
+                                <i class="fa-solid fa-copy" style="color: #059669;"></i>
+                                <span style="color: #111827 !important;">Copy All Codes</span>
+                            </button>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <!-- 2. QR Setup Step Card (Active if user clicked Setup 2FA) -->
+                {% if setup_2fa_qr and setup_2fa_secret %}
+                    <div style="padding: 24px; background: #f0fdf4; border: 2px solid #059669; border-radius: 16px; margin-bottom: 26px; box-shadow: 0 4px 16px rgba(5, 150, 105, 0.08);">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                            <div style="width: 36px; height: 36px; border-radius: 10px; background: #1c3328; color: #a3e635; display: flex; align-items: center; justify-content: center; font-size: 16px;">
+                                <i class="fa-solid fa-qrcode"></i>
+                            </div>
+                            <h2 style="font-family: var(--font-display); font-size: 1.25rem; font-weight: 800; color: #064e3b; margin: 0;">Set Up Two-Factor Authentication (TOTP)</h2>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: center;">
+                            <div style="background: #ffffff; padding: 12px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #d1d5db;">
+                                <img src="{{ setup_2fa_qr }}" alt="Google Authenticator QR Code" style="display: block; width: 170px; height: 170px;">
+                            </div>
+                            <div>
+                                <ol style="margin: 0 0 16px 20px; padding: 0; color: var(--admin-text-body); font-size: 0.88rem; line-height: 1.7;">
+                                    <li>Open <strong>Google Authenticator</strong>, <strong>Authy</strong>, or <strong>Microsoft Authenticator</strong> on your phone.</li>
+                                    <li style="margin-top: 6px;">
+                                        Tap <strong>+</strong> and scan the QR code on the left, or enter the key manually:
+                                        <div style="display: flex; align-items: center; gap: 8px; margin: 8px 0;">
+                                            <code id="setup-key-val" style="color: #065f46; background: #ffffff; border: 1px solid #10b981; font-family: monospace; font-size: 1.05rem; font-weight: 800; padding: 5px 12px; border-radius: 8px; letter-spacing: 1.5px; user-select: all; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">{{ setup_2fa_secret }}</code>
+                                            <button type="button" onclick="navigator.clipboard.writeText('{{ setup_2fa_secret }}'); alert('Secret key copied to clipboard!');" class="btn-white-pill" style="padding: 5px 12px; font-size: 0.78rem; font-weight: 700; color: #111827 !important; border: 1px solid #d1d5db;">
+                                                <i class="fa-solid fa-copy"></i> Copy Key
+                                            </button>
+                                        </div>
+                                    </li>
+                                    <li>Enter the 6-digit confirmation code generated by your app below:</li>
+                                </ol>
+
+                                <div style="font-size: 0.78rem; color: #9a3412; background: #fff7ed; border: 1px solid #fed7aa; padding: 6px 12px; border-radius: 8px; margin-bottom: 14px; display: inline-flex; align-items: center; gap: 6px;">
+                                    <i class="fa-solid fa-clock" style="color: #ea580c;"></i>
+                                    <span>Tip: Ensure your phone's date & time is set to <strong>Automatic Network Time</strong>.</span>
+                                </div>
+
+                                <form method="POST" action="{{ url_for('admin.account', tab='2fa') }}" style="display: flex; gap: 12px; max-width: 380px;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="action" value="confirm_enable_2fa">
+                                    <input type="hidden" name="secret" value="{{ setup_2fa_secret }}">
+
+                                    <input type="text" name="totp_code" required autofocus placeholder="000 000" maxlength="8"
+                                           style="font-family: monospace; font-size: 1.3rem; letter-spacing: 3px; font-weight: 800; text-align: center; width: 160px; padding: 10px; background: #ffffff; border: 2px solid #10b981; border-radius: 10px; color: #064e3b; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);">
+
+                                    <button type="submit" class="btn-dark-pill" style="white-space: nowrap; padding: 10px 22px; font-weight: 700;">
+                                        <i class="fa-solid fa-check" style="color: #a3e635 !important;"></i>
+                                        <span style="color: #ffffff !important;">Activate 2FA</span>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <!-- 3. Current 2FA State Card -->
+                <div class="form-card">
+                    <div class="form-card-title">
+                        <i class="fa-solid fa-shield-halved" style="color: var(--admin-primary);"></i>
+                        <span>Two-Factor Authentication Status</span>
+                    </div>
+
+                    {% if current_user.mfa_enabled %}
+                        <div style="padding: 18px 20px; background: #ecfdf5; border: 1.5px solid #10b981; border-radius: 12px; margin-bottom: 22px;">
+                            <div style="display: flex; align-items: center; gap: 10px; color: #065f46; font-weight: 800; font-size: 1.05rem; margin-bottom: 6px;">
+                                <i class="fa-solid fa-circle-check" style="color: #059669; font-size: 1.2rem;"></i>
+                                <span>Two-Factor Authentication is Active & Enforced</span>
+                            </div>
+                            <p style="font-size: 0.85rem; color: #047857; margin: 0; line-height: 1.5;">
+                                Your admin account is strictly protected. Every login requires a 6-digit TOTP code generated by Google Authenticator or Authy.
+                            </p>
+                        </div>
+
+                        <div style="border-top: 1px solid var(--admin-border); padding-top: 20px; margin-top: 10px;">
+                            <div style="font-size: 0.9rem; font-weight: 700; color: #991b1b; margin-bottom: 6px;">
+                                <i class="fa-solid fa-triangle-exclamation" style="margin-right: 6px;"></i>Disable Two-Factor Authentication
+                            </div>
+                            <p style="font-size: 0.8rem; color: var(--admin-text-muted); margin-bottom: 14px;">
+                                Disabling 2FA reduces account security. You will only need your username and password to log in.
+                            </p>
+
+                            <form method="POST" action="{{ url_for('admin.account', tab='2fa') }}" onsubmit="return confirm('Are you sure you want to disable 2FA? This will lower your account security.');" style="max-width: 480px;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="action" value="disable_2fa">
+
+                                <div class="form-group" style="margin-bottom: 14px;">
+                                    <label class="form-label" for="disable_2fa_pwd">Confirm Current Password to Deactivate</label>
+                                    <input type="password" id="disable_2fa_pwd" name="current_password" class="form-input" required placeholder="Enter password to disable 2FA">
+                                </div>
+
+                                <button type="submit" class="btn-white-pill" style="color: #dc2626 !important; font-weight: 700; border-color: #fca5a5; padding: 10px 20px;">
+                                    <i class="fa-solid fa-shield-slash"></i>
+                                    <span>Disable Two-Factor Authentication</span>
+                                </button>
+                            </form>
+                        </div>
+                    {% else %}
+                        <div style="padding: 18px 20px; background: #fff7ed; border: 1.5px solid #ea580c; border-radius: 12px; margin-bottom: 22px;">
+                            <div style="display: flex; align-items: center; gap: 10px; color: #9a3412; font-weight: 800; font-size: 1.05rem; margin-bottom: 6px;">
+                                <i class="fa-solid fa-shield-exclamation" style="color: #ea580c; font-size: 1.2rem;"></i>
+                                <span>2FA is Not Yet Active</span>
+                            </div>
+                            <p style="font-size: 0.85rem; color: #7c2d12; margin: 0; line-height: 1.5;">
+                                Protect your admin panel against brute-force attacks and credential theft. Enable 2FA using Google Authenticator, Authy, or Microsoft Authenticator.
+                            </p>
+                        </div>
+
+                        {% if not setup_2fa_qr %}
+                            <form method="POST" action="{{ url_for('admin.account', tab='2fa') }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="action" value="setup_2fa">
+
+                                <button type="submit" class="btn-dark-pill" style="padding: 12px 28px; font-weight: 700; font-size: 0.95rem;">
+                                    <i class="fa-solid fa-qrcode" style="color: #a3e635 !important;"></i>
+                                    <span style="color: #ffffff !important;">Set Up Two-Factor Authentication</span>
+                                </button>
+                            </form>
+                        {% endif %}
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 4: BACKUP & RECOVERY -->
+        <!-- ========================================== -->
+        <div id="panel-recovery" class="cms-tab-panel {% if active_tab == 'recovery' %}active{% endif %}">
+            
+            <!-- Master Emergency Recovery Key Generated Banner -->
+            {% if generated_recovery_key %}
+                <div style="padding: 22px; background: #fff7ed; border: 2px solid #ea580c; border-radius: 16px; margin-bottom: 24px; box-shadow: 0 4px 16px rgba(234, 88, 12, 0.08); max-width: 100%;">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                        <div style="width: 36px; height: 36px; border-radius: 10px; background: #ea580c; color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 16px;">
+                            <i class="fa-solid fa-key"></i>
+                        </div>
+                        <h3 style="font-family: var(--font-display); font-size: 1.18rem; font-weight: 800; color: #9a3412; margin: 0;">Master Emergency Recovery Key Generated</h3>
+                    </div>
+                    <p style="font-size: 0.85rem; color: #7c2d12; margin-bottom: 14px; line-height: 1.5;">
+                        Save this key in a secure password manager or offline vault. If you ever forget your password or lose access to your 2FA device, you can use this key at <code style="color: #9a3412; background: #ffedd5; padding: 2px 6px; border-radius: 4px; font-weight: 700;">/admin/forgot-password</code> to reset your account.
+                    </p>
+                    <div style="display: flex; align-items: center; gap: 12px; background: #ffffff; padding: 12px 18px; border-radius: 10px; border: 1.5px solid #f97316; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);">
+                        <span id="recovery-key-text" style="font-family: monospace; font-size: 1.25rem; font-weight: 800; color: #9a3412; letter-spacing: 2px; user-select: all;">{{ generated_recovery_key }}</span>
+                        <button type="button" onclick="navigator.clipboard.writeText('{{ generated_recovery_key }}'); alert('Recovery key copied to clipboard!');" class="btn-white-pill" style="margin-left: auto; padding: 6px 14px; font-size: 0.82rem; font-weight: 700; color: #111827 !important; border: 1px solid #d1d5db;">
+                            <i class="fa-solid fa-copy"></i> Copy Key
+                        </button>
+                    </div>
+                </div>
+            {% endif %}
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 24px; max-width: 100%;">
+                
+                <!-- Card 1: Master Emergency Recovery Key -->
+                <div class="form-card">
+                    <div class="form-card-title">
+                        <i class="fa-solid fa-key" style="color: #ea580c;"></i>
+                        <span>Emergency Account Recovery</span>
+                    </div>
+
+                    <p style="font-size: 0.83rem; color: var(--admin-text-muted); margin-bottom: 16px; line-height: 1.5;">
+                        If you ever forget your password or lose your 2FA phone, you can regain account access at <code style="color: #065f46; font-weight: 700;">/admin/forgot-password</code> using this cryptographic key.
+                    </p>
+
+                    <form method="POST" action="{{ url_for('admin.account', tab='recovery') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="action" value="generate_recovery_key">
+
+                        <div class="form-group" style="margin-bottom: 16px;">
+                            <label class="form-label" for="recovery_current_pwd">Enter Current Password to Rotate Key</label>
+                            <input type="password" id="recovery_current_pwd" name="current_password" class="form-input" required placeholder="Enter active password">
+                        </div>
+
+                        <button type="submit" class="btn-white-pill" style="width: 100%; justify-content: center; font-size: 0.88rem; font-weight: 700; color: #111827 !important; border: 1.5px solid #d1d5db; padding: 11px;">
+                            <i class="fa-solid fa-arrows-rotate" style="color: #ea580c;"></i>
+                            <span>Generate Fresh Recovery Key</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Card 2: Database Backup Snapshot -->
+                <div class="form-card">
+                    <div class="form-card-title">
+                        <i class="fa-solid fa-database" style="color: var(--admin-primary);"></i>
+                        <span>Database Snapshot Backup</span>
+                    </div>
+
+                    <p style="font-size: 0.83rem; color: var(--admin-text-muted); margin-bottom: 16px; line-height: 1.5;">
+                        Download an uncorrupted binary snapshot of your SQLite database (<code style="color: #065f46; font-weight: 700;">data/cms.db</code>) containing all articles, categories, settings, media, and security audit logs.
+                    </p>
+
+                    <div style="background: rgba(0,0,0,0.02); border: 1px solid var(--admin-border); border-radius: 10px; padding: 12px 14px; margin-bottom: 20px;">
+                        <div style="font-size: 0.78rem; color: var(--admin-text-muted); margin-bottom: 4px;">Active Storage Engine</div>
+                        <div style="font-weight: 700; color: var(--admin-text-main); font-size: 0.9rem;">
+                            <i class="fa-solid fa-server" style="color: var(--admin-primary); margin-right: 6px;"></i> SQLite 3 / WAL Mode
+                        </div>
+                    </div>
+
+                    <a href="{{ url_for('admin.database_backup') }}" class="btn-dark-pill" style="width: 100%; justify-content: center; font-size: 0.88rem; padding: 12px; font-weight: 700;">
+                        <i class="fa-solid fa-download" style="color: #a3e635 !important;"></i>
+                        <span style="color: #ffffff !important;">Download Database Backup (.db)</span>
+                    </a>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 5: SECURITY AUDIT TRAIL -->
+        <!-- ========================================== -->
+        <div id="panel-audit" class="cms-tab-panel {% if active_tab == 'audit' %}active{% endif %}">
+            <div class="section-control-bar" style="margin-top: 0; margin-bottom: 16px;">
+                <h2 class="section-heading">
+                    <i class="fa-solid fa-clipboard-list" style="color: var(--admin-primary); font-size: 17px;"></i>
+                    <span>Administrative Access & Security Audit Trail</span>
+                </h2>
+                <span style="font-size: 0.82rem; color: var(--admin-text-muted);">Real-time recording of logins, password updates, 2FA operations, and content modifications</span>
+            </div>
+
+            <div class="nested-card">
+                {% if audit_logs %}
+                    <div class="table-responsive">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th style="min-width: 170px;">Event Action</th>
+                                    <th>User / Initiator</th>
+                                    <th>Details</th>
+                                    <th>IP Address</th>
+                                    <th style="text-align: right; min-width: 150px;">Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in audit_logs %}
+                                    <tr>
+                                        <td>
+                                            {% if 'SUCCESS' in log.action or 'SAVED' in log.action or 'CREATED' in log.action or 'UPDATED' in log.action or 'ACTIVATED' in log.action %}
+                                                <span class="status-badge published"><i class="fa-solid fa-circle-check"></i> {{ log.action }}</span>
+                                            {% elif 'FAILED' in log.action or 'LOCKOUT' in log.action or 'CSRF' in log.action %}
+                                                <span class="status-badge" style="background: rgba(239, 68, 68, 0.12); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.25);"><i class="fa-solid fa-triangle-exclamation"></i> {{ log.action }}</span>
+                                            {% elif 'DELETED' in log.action or 'DEACTIVATED' in log.action %}
+                                                <span class="status-badge" style="background: rgba(249, 115, 22, 0.12); color: #ea580c; border: 1px solid rgba(249, 115, 22, 0.25);"><i class="fa-solid fa-trash-can"></i> {{ log.action }}</span>
+                                            {% else %}
+                                                <span class="status-badge scheduled"><i class="fa-solid fa-clock"></i> {{ log.action }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span style="font-weight: 700; color: var(--admin-text-main); font-size: 0.9rem;">
+                                                {{ log.username or 'System / Anonymous' }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span style="font-size: 0.85rem; color: var(--admin-text-body);">
+                                                {{ log.details or '—' }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <code style="font-family: monospace; font-size: 0.82rem; color: #065f46; background: #ecfdf5; padding: 3px 8px; border-radius: 6px; border: 1px solid #a7f3d0;">
+                                                {{ log.ip_address or '127.0.0.1' }}
+                                            </code>
+                                        </td>
+                                        <td style="text-align: right; color: var(--admin-text-muted); font-size: 0.82rem; white-space: nowrap;">
+                                            {{ log.created_at }}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div style="padding: 40px 20px; text-align: center; color: var(--admin-text-muted);">
+                        <i class="fa-solid fa-shield-check" style="font-size: 32px; opacity: 0.4; margin-bottom: 10px;"></i>
+                        <p>No security events recorded yet.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Client-side Scripts for Tab Switching, Backup Codes Download & Clipboard -->
+<script>
+    function switchAccountTab(tabName) {
+        // 1. Update tab button active states
+        const tabBtns = document.querySelectorAll('#accountTabsBar .cms-tab-btn');
+        tabBtns.forEach(btn => {
+            if (btn.getAttribute('data-tab') === tabName) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+
+        // 2. Hide all panels and show only the active panel
+        const panels = document.querySelectorAll('.cms-tab-panel');
+        panels.forEach(panel => {
+            panel.classList.remove('active');
+        });
+
+        const activePanel = document.getElementById('panel-' + tabName);
+        if (activePanel) {
+            activePanel.classList.add('active');
+        }
+
+        // 3. Keep URL in sync without triggering full page reload
+        try {
+            const url = new URL(window.location);
+            url.searchParams.set('tab', tabName);
+            window.history.replaceState(null, '', url.toString());
+        } catch (e) {
+            window.location.hash = tabName;
+        }
+    }
+
+    // Initialize tab from URL on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const queryTab = urlParams.get('tab');
+        const hashTab = window.location.hash.replace('#', '');
+        const serverTab = "{{ active_tab or 'profile' }}";
+
+        const targetTab = queryTab || hashTab || serverTab;
+        if (targetTab && document.getElementById('panel-' + targetTab)) {
+            switchAccountTab(targetTab);
+        }
+    });
+
+    function downloadBackupCodes() {
+        {% if generated_backup_codes %}
+        const codesList = [{% for c in generated_backup_codes %}"{{ c }}"{% if not loop.last %}, {% endif %}{% endfor %}];
+        const content = 
+`==================================================
+STELLAR STUDIO — 2FA EMERGENCY BACKUP CODES
+==================================================
+Account: {{ current_user.username }}
+Generated on: ${new Date().toLocaleString()}
+
+These single-use backup scratch codes allow you to log in 
+if you lose access to your Google Authenticator phone.
+Each code can only be used ONCE.
+
+--------------------------------------------------
+` + codesList.map((code, idx) => `  ${idx + 1}.  ${code}`).join('\n') + `
+--------------------------------------------------
+
+Store this file safely in an encrypted vault or password manager.
+==================================================`;
+
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `stellar_2fa_backup_codes_{{ current_user.username }}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        {% else %}
+        alert('No backup codes available to download.');
+        {% endif %}
+    }
+
+    function copyAllBackupCodes() {
+        {% if generated_backup_codes %}
+        const codesList = [{% for c in generated_backup_codes %}"{{ c }}"{% if not loop.last %}, {% endif %}{% endfor %}];
+        navigator.clipboard.writeText(codesList.join('\n')).then(() => {
+            alert('All 8 emergency backup codes copied to clipboard!');
+        }).catch(() => {
+            alert('Failed to copy. Please select and copy manually.');
+        });
+        {% endif %}
+    }
+</script>
+{% endblock %}

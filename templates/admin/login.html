@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+    <title>Admin Login | Stellar Studio</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+<body class="admin-body">
+    <div class="auth-wrapper">
+        <div class="auth-card">
+            <div style="text-align: center; margin-bottom: 28px;">
+                <div class="brand-icon" style="width: 52px; height: 52px; font-size: 22px; border-radius: 14px; margin: 0 auto 16px;">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <h1 style="font-family: var(--font-display); font-size: 1.6rem; font-weight: 800; color: var(--admin-text-main); margin-bottom: 6px;">Admin Portal</h1>
+                <p style="color: var(--admin-text-muted); font-size: 0.88rem;">Sign in to access your publishing workspace and site settings.</p>
+            </div>
+
+            <!-- Flash alerts -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div style="margin-bottom: 20px;">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'success' if category == 'success' else 'error' }}">
+                                <i class="fa-solid fa-circle-exclamation"></i>
+                                <span>{{ message }}</span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <form method="POST" action="{{ url_for('admin.login') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="form-group" style="margin-bottom: 18px;">
+                    <label class="form-label" for="username">Username or Email</label>
+                    <input type="text" id="username" name="username" class="form-input" required autofocus placeholder="Enter your username" autocomplete="username">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label class="form-label" for="password">Password</label>
+                    <div style="position: relative;">
+                        <input type="password" id="password" name="password" class="form-input" required placeholder="••••••••••••" autocomplete="current-password">
+                        <button type="button" onclick="togglePass('password', this)" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--admin-text-dim); cursor: pointer;">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; font-size: 0.85rem;">
+                    <label style="display: flex; align-items: center; gap: 8px; color: var(--admin-text-body); cursor: pointer;">
+                        <input type="checkbox" name="remember_me" id="remember_me" value="1" style="accent-color: var(--admin-primary); width: 16px; height: 16px;">
+                        <span>Keep me signed in</span>
+                    </label>
+                    <a href="{{ url_for('admin.forgot_password') }}" style="color: var(--admin-primary); text-decoration: none; font-size: 0.82rem; font-weight: 600;">
+                        <i class="fa-solid fa-key" style="margin-right: 4px;"></i>Forgot Password?
+                    </a>
+                </div>
+
+                <button type="submit" class="btn-dark-pill" style="width: 100%; justify-content: center; padding: 12px; font-size: 0.95rem;">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                    <span>Secure Sign In</span>
+                </button>
+            </form>
+
+            <div style="text-align: center; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--admin-border);">
+                <a href="{{ url_for('index') }}" style="color: var(--admin-text-muted); text-decoration: none; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <span>Return to Downloader</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function togglePass(id, btn) {
+            const input = document.getElementById(id);
+            const icon = btn.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fa-solid fa-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'fa-solid fa-eye';
+            }
+        }
+    </script>
+</body>
+</html>

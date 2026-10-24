@@ -6,7 +6,9 @@ import json
 import threading
 import urllib.parse
 import ipaddress
-from flask import Flask, render_template, request, jsonify, Response, send_file, redirect, url_for
+import secrets
+from flask import Flask, render_template, request, jsonify, Response, send_file, redirect, url_for, session, g, abort
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from core.downloader import start_download_thread, get_progress, cancel_download
 from core.cleanup import start_cleanup_scheduler
@@ -15,12 +17,106 @@ from core.security import (
     check_rate_limit, 
     acquire_concurrency_slot, 
     release_concurrency_slot, 
-    is_safe_filepath
+    is_safe_filepath,
+    ssrf_safe_socket
 )
 
+from datetime import timedelta
+
+# CMS & Database Layer
+from core.db import init_db, get_all_settings, get_db_connection
+from core.auth import generate_csrf_token, validate_csrf_token, get_current_user, login_required, admin_required
+from core.blog_routes import blog_bp
+from core.admin_routes import admin_bp
+
+def load_or_generate_secret_key():
+    """
+    Returns a cryptographically secure session secret key.
+    Prioritizes the SECRET_KEY environment variable.
+    If absent, generates a persistent 64-byte random key stored in data/.secret_key.
+    NEVER falls back to a static hardcoded key in source code.
+    """
+    env_secret = os.environ.get('SECRET_KEY')
+    if env_secret and len(env_secret.strip()) >= 16:
+        return env_secret.strip()
+
+    data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data'))
+    os.makedirs(data_dir, exist_ok=True)
+    key_file = os.path.join(data_dir, '.secret_key')
+
+    if os.path.isfile(key_file):
+        try:
+            with open(key_file, 'rb') as f:
+                key = f.read().strip()
+                if len(key) >= 32:
+                    return key
+        except Exception:
+            pass
+
+    fresh_secret = secrets.token_bytes(64)
+    try:
+        with open(key_file, 'wb') as f:
+            f.write(fresh_secret)
+    except Exception:
+        pass
+    return fresh_secret
+
 app = Flask(__name__)
-app.secret_key = os.urandom(32) # Secure 256-bit cryptographically strong key
-app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024 # 1 MB Max payload limit to prevent DoS
+# Cryptographically strong session key with environment variable support
+is_prod = 'DYNO' in os.environ or os.environ.get('FLASK_ENV') == 'production' or os.environ.get('ENVIRONMENT') == 'production'
+
+def is_trusted_proxy():
+    return 'DYNO' in os.environ or os.environ.get('TRUST_PROXY', 'false').lower() == 'true'
+
+if is_trusted_proxy():
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+app.secret_key = load_or_generate_secret_key()
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = is_prod
+app.config['SESSION_COOKIE_NAME'] = '__Host-stellar' if is_prod else '__stellar_session'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=6)
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 # 10 MB Max payload limit for media uploads
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+# Concurrency limits for live SSE status streams to prevent Gunicorn thread exhaustion
+SSE_STREAM_LOCK = threading.Lock()
+ACTIVE_SSE_BY_TASK = {} # {task_id: int}
+ACTIVE_SSE_BY_IP = {}   # {client_ip: int}
+MAX_SSE_PER_TASK = 2    # Max 2 concurrent SSE listeners per task ID
+MAX_SSE_PER_IP = 3      # Max 3 concurrent SSE listeners per client IP
+
+# Initialize Database Schema
+init_db()
+
+# Custom Secret Admin URL Slug (Default is 'stellar-vault-786', customizable via ADMIN_SLUG in .env)
+ADMIN_SLUG = (os.environ.get('ADMIN_SLUG') or 'stellar-vault-786').strip().strip('/')
+if not ADMIN_SLUG:
+    ADMIN_SLUG = 'stellar-vault-786'
+
+# Register Blueprints
+app.register_blueprint(blog_bp)
+app.register_blueprint(admin_bp, url_prefix=f'/{ADMIN_SLUG}')
+
+# Decoy 404 for standard /admin scanning bots
+if ADMIN_SLUG != 'admin':
+    @app.route('/admin', defaults={'path': ''})
+    @app.route('/admin/<path:path>')
+    def decoy_admin_path(path):
+        abort(404)
+
+# Global Jinja Template Context Processor (Auto-syncs settings to ALL templates)
+@app.context_processor
+def inject_globals():
+    return {
+        'csrf_token': generate_csrf_token,
+        'current_user': get_current_user(),
+        'settings': get_all_settings(),
+        'csp_nonce': getattr(g, 'csp_nonce', ''),
+        'admin_slug': ADMIN_SLUG
+    }
 
 DOWNLOADS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'downloads'))
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
@@ -31,35 +127,70 @@ start_cleanup_scheduler(DOWNLOADS_DIR)
 # Custom Security Error Handlers (Prevents Framework Information Disclosure)
 @app.errorhandler(400)
 def handle_400(e):
-    return jsonify({'error': 'Bad request'}), 400
+    if request.path.startswith('/api/') or request.is_json:
+        return jsonify({'error': 'Bad request'}), 400
+    return "<h3>400 Bad Request</h3>", 400
 
 @app.errorhandler(403)
 def handle_403(e):
-    return jsonify({'error': 'Access denied'}), 403
+    if request.path.startswith('/api/') or request.is_json:
+        return jsonify({'error': 'Access denied'}), 403
+    return "<h3>403 Access Denied</h3>", 403
 
 @app.errorhandler(404)
 def handle_404(e):
-    return jsonify({'error': 'Resource not found'}), 404
+    if request.path.startswith('/api/') or request.is_json:
+        return jsonify({'error': 'Resource not found'}), 404
+    return "<h3>404 Not Found</h3><p>The requested URL was not found on this server.</p>", 404
 
 @app.errorhandler(413)
 def handle_413(e):
-    return jsonify({'error': 'Payload size exceeds 1MB limit'}), 413
+    if request.path.startswith('/api/') or request.is_json:
+        return jsonify({'error': 'Payload size exceeds 10MB limit'}), 413
+    return "<h3>413 Payload Too Large (10MB limit)</h3>", 413
 
 @app.errorhandler(429)
 def handle_429(e):
-    return jsonify({'error': 'Too many requests. Please slow down.'}), 429
+    if request.path.startswith('/api/') or request.is_json:
+        return jsonify({'error': 'Too many requests. Please slow down.'}), 429
+    return "<h3>429 Too Many Requests</h3>", 429
 
 @app.errorhandler(500)
 def handle_500(e):
-    return jsonify({'error': 'Internal server error occurred'}), 500
+    if request.path.startswith('/api/') or request.is_json:
+        return jsonify({'error': 'Internal server error occurred'}), 500
+    return "<h3>500 Internal Server Error</h3>", 500
 
-# CSRF & Cross-Origin POST Attack Protection Middleware
+# HTTPS Enforcement & CSRF / Cross-Origin POST Attack Protection Middleware
 @app.before_request
-def csrf_cross_origin_guard():
+def security_before_request():
+    # Generate cryptographic per-request CSP nonce
+    g.csp_nonce = secrets.token_hex(16)
+
+    # 1. Enforce HTTPS Redirection on production / public domains
+    host = (request.headers.get('X-Forwarded-Host') or request.headers.get('Host') or '').split(':')[0].lower()
+    is_public = host and not (host.startswith(('127.', '192.168.', '10.', '172.16.')) or host in ['localhost', 'testserver'])
+    
+    # Strictly trust forwarded proto ONLY if behind an authorized trusted proxy
+    if is_trusted_proxy():
+        is_https = (request.headers.get('X-Forwarded-Proto', 'http').lower() == 'https') or request.is_secure
+    else:
+        is_https = request.is_secure
+
+    # Dynamic Session Cookie Security: If request is HTTPS or on public domain / prod, enforce Secure flag
+    if is_https or is_public or is_prod:
+        app.config['SESSION_COOKIE_SECURE'] = True
+    else:
+        app.config['SESSION_COOKIE_SECURE'] = False
+
+    if (is_prod or is_public) and not is_https:
+        https_url = request.url.replace('http://', 'https://', 1)
+        return redirect(https_url, code=301)
+
+    # 2. CSRF & Cross-Origin State-Changing Request Guard
     if request.method in ['POST', 'PUT', 'DELETE', 'PATCH']:
         origin = request.headers.get('Origin')
         referer = request.headers.get('Referer')
-        host = request.headers.get('Host')
         
         expected_host = request.headers.get('X-Forwarded-Host') or request.headers.get('Host')
 
@@ -92,10 +223,43 @@ def apply_security_headers(response):
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=(), payment=()'
     response.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
-    response.headers['Content-Security-Policy'] = (
-        "default-src 'self' https: data: 'unsafe-inline'; "
-        "frame-ancestors 'none';"
-    )
+
+    # Granular OWASP Content-Security-Policy with Per-Request Nonce
+    nonce = getattr(g, 'csp_nonce', '')
+    nonce_script = f"'nonce-{nonce}' " if nonce else ""
+    csp_directives = [
+        "default-src 'self'",
+        f"script-src 'self' {nonce_script}'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
+        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://cdn.jsdelivr.net",
+        "font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com data:",
+        "img-src 'self' data: https: blob:",
+        "media-src 'self' blob: https:",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'none'"
+    ]
+    response.headers['Content-Security-Policy'] = "; ".join(csp_directives)
+
+    # HSTS: Strict-Transport-Security enforced on HTTPS, production environments, and public domains
+    host = (request.headers.get('X-Forwarded-Host') or request.headers.get('Host') or '').split(':')[0].lower()
+    is_public = host and not (host.startswith(('127.', '192.168.', '10.', '172.16.')) or host in ['localhost', 'testserver'])
+    forwarded_proto = request.headers.get('X-Forwarded-Proto', '').lower()
+
+    if request.is_secure or forwarded_proto == 'https' or is_prod or is_public:
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains; preload'
+
+    # Prevent intermediate proxy caching of authenticated and personalized session pages (GHSA-68rp-wp8r-4726)
+    if request.path.startswith(f'/{ADMIN_SLUG}') or request.path.startswith('/admin') or session.get('user_id') or session.get('_csrf_token'):
+        response.headers['Vary'] = 'Cookie'
+
+    # Anti-indexing headers: Ensure Search Engines NEVER index admin panel, login, setup, or internal APIs
+    if (request.path.startswith(f'/{ADMIN_SLUG}') or 
+        request.path.startswith('/admin') or 
+        request.path.startswith('/api/')):
+        response.headers['X-Robots-Tag'] = 'noindex, nofollow, noarchive, nosnippet'
+
     # Mask server header banner to prevent software fingerprinting
     response.headers['Server'] = 'Protected'
     return response
@@ -117,7 +281,18 @@ def get_client_ip():
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    conn = get_db_connection()
+    recent_articles = conn.execute("""
+        SELECT a.id, a.title, a.slug, a.excerpt, a.featured_image, a.author_name,
+               a.published_at, a.created_at, c.name as category_name, c.slug as category_slug
+        FROM articles a
+        LEFT JOIN categories c ON a.category_id = c.id
+        WHERE a.status = 'published' AND a.published_at <= CURRENT_TIMESTAMP
+        ORDER BY a.published_at DESC
+        LIMIT 3
+    """).fetchall()
+    conn.close()
+    return render_template('index.html', recent_articles=recent_articles)
 
 @app.route('/preview')
 def preview_ui():
@@ -125,25 +300,23 @@ def preview_ui():
 
 @app.route('/api/health')
 def health_check():
-    repo_root = os.path.dirname(os.path.abspath(__file__))
-    cookies_path = os.path.join(repo_root, 'cookies.txt')
-    www_cookies_path = os.path.join(repo_root, 'www.youtube.com_cookies.txt')
-    qjs_path = os.path.join(repo_root, 'bin', 'qjs')
+    """Sanitized public health endpoint for deployment probes and load balancers."""
     return jsonify({
         'status': 'healthy',
-        'version': 'v1.7-visionos',
-        'has_cookies_txt': os.path.isfile(cookies_path),
-        'cookies_size': os.path.getsize(cookies_path) if os.path.isfile(cookies_path) else 0,
-        'has_www_cookies': os.path.isfile(www_cookies_path),
-        'has_qjs': os.path.isfile(qjs_path),
-        'qjs_size': os.path.getsize(qjs_path) if os.path.isfile(qjs_path) else 0,
-        'node_found': shutil.which('node'),
-        'ffmpeg_found': shutil.which('ffmpeg')
+        'service': 'Stellar Engine'
     })
 
 @app.route('/api/debug_ytdlp')
+@login_required
+@admin_required
 def debug_ytdlp():
-    url = request.args.get('url', 'https://www.youtube.com/watch?v=Z3QQUSysT9M')
+    """Restricted diagnostic tool accessible ONLY to authenticated administrators."""
+    url = request.args.get('url', 'https://www.youtube.com/watch?v=Z3QQUSysT9M').strip()
+    # SSRF Protection: Prevent internal loopback / cloud metadata scanning via diagnostic endpoint
+    is_valid_url, err_msg = validate_url(url)
+    if not is_valid_url:
+        return jsonify({'status': 'rejected', 'error': f'SSRF Protection: {err_msg}'}), 400
+
     import yt_dlp
     logs = []
     class CustomLogger:
@@ -161,10 +334,10 @@ def debug_ytdlp():
         'verbose': True,
         'force_ipv4': True,
         'noplaylist': True,
-        'cookiefile': cookies_path if os.path.isfile(cookies_path) else None,
+        'cookiefile': cookies_path if os.path.isfile(cookies_path) and os.path.getsize(cookies_path) > 100 else None,
         'extractor_args': {
             'youtube': {
-                'player_client': ['visionos', 'ios']
+                'player_client': ['android', 'ios']
             }
         }
     }
@@ -174,11 +347,12 @@ def debug_ytdlp():
 
     result = {}
     try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            result['title'] = info.get('title')
-            result['formats_count'] = len(info.get('formats', []))
-            result['status'] = 'success'
+        with ssrf_safe_socket():
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                result['title'] = info.get('title')
+                result['formats_count'] = len(info.get('formats', []))
+                result['status'] = 'success'
     except Exception as e:
         result['status'] = 'failed'
         result['exception'] = str(e)
@@ -200,6 +374,11 @@ def trigger_download():
     data = request.get_json(silent=True)
     if not data or not isinstance(data, dict):
         return jsonify({'error': 'Invalid JSON request payload'}), 400
+
+    # CSRF Verification for active browser sessions
+    csrf_token = request.headers.get('X-CSRFToken') or data.get('csrf_token')
+    if session.get('_csrf_token') and not validate_csrf_token(csrf_token):
+        return jsonify({'error': 'Security validation failed: Invalid or expired CSRF token. Please refresh the page.'}), 403
 
     url = (data.get('url') or '').strip()
     format_type = str(data.get('format', 'mp4')).lower().strip()
@@ -251,17 +430,58 @@ def status(task_id):
     except ValueError:
         return jsonify({'error': 'Invalid task ID format'}), 400
 
+    # Thread Exhaustion & DoS Guard 1: Verify task exists before keeping SSE stream open
+    initial_check = get_progress(task_id)
+    if initial_check is None:
+        # Grace period for worker thread launch
+        for _ in range(2):
+            time.sleep(1)
+            initial_check = get_progress(task_id)
+            if initial_check:
+                break
+        if initial_check is None:
+            return jsonify({'error': 'Task not found or expired'}), 404
+
+    # Thread Exhaustion & DoS Guard 2: Enforce strict concurrency limits per task and per IP
+    client_ip = get_client_ip()
+    with SSE_STREAM_LOCK:
+        if ACTIVE_SSE_BY_TASK.get(task_id, 0) >= MAX_SSE_PER_TASK:
+            return jsonify({'error': 'Too many active monitor connections for this task'}), 429
+        if ACTIVE_SSE_BY_IP.get(client_ip, 0) >= MAX_SSE_PER_IP:
+            return jsonify({'error': 'Too many active monitor connections from your IP. Please close extra tabs.'}), 429
+
+        ACTIVE_SSE_BY_TASK[task_id] = ACTIVE_SSE_BY_TASK.get(task_id, 0) + 1
+        ACTIVE_SSE_BY_IP[client_ip] = ACTIVE_SSE_BY_IP.get(client_ip, 0) + 1
+
     def event_stream():
-        while True:
-            progress_data = get_progress(task_id)
-            if not progress_data:
-                yield f"data: {{\"status\": \"initializing\"}}\n\n"
-            else:
+        max_duration = 300 # 5 minutes maximum stream duration to protect WSGI threads
+        start_time = time.time()
+        try:
+            while True:
+                if time.time() - start_time > max_duration:
+                    yield f"data: {{\"status\": \"error\", \"error\": \"Connection stream timed out.\"}}\n\n"
+                    break
+
+                progress_data = get_progress(task_id)
+                if not progress_data:
+                    yield f"data: {{\"status\": \"error\", \"error\": \"Task expired.\"}}\n\n"
+                    break
+
                 yield f"data: {json.dumps(progress_data)}\n\n"
                 if progress_data.get('status') in ['finished', 'error', 'cancelled']:
                     break
-            time.sleep(1)
-            
+                time.sleep(1)
+        finally:
+            with SSE_STREAM_LOCK:
+                if task_id in ACTIVE_SSE_BY_TASK and ACTIVE_SSE_BY_TASK[task_id] > 0:
+                    ACTIVE_SSE_BY_TASK[task_id] -= 1
+                    if ACTIVE_SSE_BY_TASK[task_id] == 0:
+                        del ACTIVE_SSE_BY_TASK[task_id]
+                if client_ip in ACTIVE_SSE_BY_IP and ACTIVE_SSE_BY_IP[client_ip] > 0:
+                    ACTIVE_SSE_BY_IP[client_ip] -= 1
+                    if ACTIVE_SSE_BY_IP[client_ip] == 0:
+                        del ACTIVE_SSE_BY_IP[client_ip]
+
     return Response(event_stream(), mimetype="text/event-stream")
 
 @app.route('/api/cancel/<task_id>', methods=['POST'])
@@ -271,6 +491,10 @@ def cancel(task_id):
         uuid.UUID(task_id)
     except ValueError:
         return jsonify({'error': 'Invalid task ID format'}), 400
+
+    csrf_token = request.headers.get('X-CSRFToken') or request.form.get('csrf_token')
+    if session.get('_csrf_token') and not validate_csrf_token(csrf_token):
+        return jsonify({'error': 'Security validation failed: Invalid or expired CSRF token'}), 403
         
     success = cancel_download(task_id)
     if success:

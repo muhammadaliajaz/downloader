@@ -1,0 +1,173 @@
+{% extends "admin/base.html" %}
+
+{% set active_page = 'media' %}
+{% block page_title %}Media Library{% endblock %}
+
+{% block content %}
+<!-- Elevated SaaS App Sheet -->
+<div class="cms-sheet">
+
+    <!-- Top Sheet Header -->
+    <div class="cms-sheet-header">
+        <div class="cms-title-wrap">
+            <div class="brand-icon" style="width: 44px; height: 44px; font-size: 18px; border-radius: 12px;">
+                <i class="fa-solid fa-photo-film"></i>
+            </div>
+            <div>
+                <h1 class="cms-title">Media & Assets Library</h1>
+            </div>
+        </div>
+
+        <div class="cms-actions-group">
+            <button type="button" class="btn-dark-pill" onclick="document.getElementById('fileInput').click()">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <span>Upload New Asset</span>
+            </button>
+
+            <a href="{{ url_for('blog.index') }}" target="_blank" class="btn-white-pill">
+                <i class="fa-solid fa-arrow-up-right-from-square" style="color: var(--admin-text-muted);"></i>
+                <span>Preview Blog</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Upload Dropzone Card -->
+    <div style="padding: 28px 32px 16px;">
+        <div class="form-card" style="margin: 0;">
+            <div class="form-card-title">
+                <i class="fa-solid fa-cloud-arrow-up" style="color: var(--admin-primary);"></i>
+                <span>Upload New Media File</span>
+            </div>
+
+            <form method="POST" enctype="multipart/form-data" action="{{ url_for('admin.media_library') }}" id="mediaUploadForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div id="dropZone" class="dropzone-box">
+                    <div style="font-size: 38px; color: var(--admin-primary); margin-bottom: 12px;">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                    </div>
+                    <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--admin-text-main); margin-bottom: 6px;">Drag & Drop files here, or click to browse</h3>
+                    <p style="color: var(--admin-text-muted); font-size: 0.82rem; margin-bottom: 16px;">Supports JPG, PNG, WebP, GIF, SVG (Max file size: 5 MB)</p>
+                    
+                    <input type="file" name="file" id="fileInput" accept="image/*" style="display: none;" onchange="this.form.submit()">
+                    <button type="button" class="btn-dark-pill" onclick="document.getElementById('fileInput').click()" style="display: inline-flex;">
+                        <i class="fa-solid fa-folder-open"></i>
+                        <span>Select File from Computer</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Media Gallery Nested Card -->
+    <div class="nested-card">
+        <div class="nested-card-title">
+            <span class="badge-circle-num">{{ total_media }}</span>
+            <span>Uploaded Media Gallery</span>
+        </div>
+
+        {% if media_items %}
+            <div style="padding: 20px;">
+                <div class="media-grid">
+                    {% for item in media_items %}
+                        <div class="media-item" tabindex="0" onclick="this.classList.toggle('active-mobile')">
+                            <img src="{{ item.filepath }}" alt="{{ item.original_name }}" loading="lazy">
+                            <div class="media-actions">
+                                <button type="button" class="btn-icon" title="Copy Media URL" onclick="event.stopPropagation(); copyMediaUrl('{{ item.filepath }}', this)">
+                                    <i class="fa-solid fa-copy"></i>
+                                </button>
+                                <a href="{{ item.filepath }}" target="_blank" class="btn-icon" title="View Full Image" onclick="event.stopPropagation();">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                </a>
+                                <form method="POST" action="{{ url_for('admin.media_delete', media_id=item.id) }}" style="display:inline;" onsubmit="event.stopPropagation(); return confirm('Permanently delete this media file?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn-icon danger" title="Delete File">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            {% if total_pages > 1 %}
+                <div style="padding: 18px 24px; border-top: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                    <div style="color: var(--admin-text-muted); font-size: 0.85rem;">
+                        Page {{ current_page }} of {{ total_pages }} ({{ total_media }} assets)
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        {% if current_page > 1 %}
+                            <a href="{{ url_for('admin.media_library', page=current_page-1) }}" class="btn-icon">
+                                <i class="fa-solid fa-chevron-left"></i>
+                            </a>
+                        {% endif %}
+                        {% if current_page < total_pages %}
+                            <a href="{{ url_for('admin.media_library', page=current_page+1) }}" class="btn-icon">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        {% else %}
+            <div style="padding: 56px 24px; text-align: center; color: var(--admin-text-muted);">
+                <div style="font-size: 42px; margin-bottom: 12px; opacity: 0.4;"><i class="fa-solid fa-photo-film"></i></div>
+                <h3 style="color: var(--admin-text-main); font-size: 1.15rem; margin-bottom: 6px;">No media files uploaded yet</h3>
+                <p style="font-size: 0.9rem;">Upload images to use them in your blog posts and featured cards.</p>
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Copy URL function with tooltip notification
+    function copyMediaUrl(relativeUrl, btn) {
+        const fullUrl = window.location.origin + relativeUrl;
+        navigator.clipboard.writeText(fullUrl).then(() => {
+            const originalIcon = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-check" style="color: #065f46;"></i>';
+            setTimeout(() => {
+                btn.innerHTML = originalIcon;
+            }, 1800);
+        }).catch(err => {
+            prompt('Copy image URL:', fullUrl);
+        });
+    }
+
+    // Drag and drop setup
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+
+    if (dropZone && fileInput) {
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.style.borderColor = 'var(--admin-primary)';
+                dropZone.style.background = '#edf5f0';
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.style.borderColor = 'var(--admin-border)';
+                dropZone.style.background = '#fbfdfc';
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length) {
+                fileInput.files = files;
+                document.getElementById('mediaUploadForm').submit();
+            }
+        });
+    }
+</script>
+{% endblock %}

@@ -8,7 +8,7 @@ import tempfile
 
 from core.ary_extractor import extract_ary_stream, is_ary_url
 from core.tiktok_extractor import extract_tiktok_stream, is_tiktok_url, normalize_tiktok_url
-from core.security import release_concurrency_slot, is_safe_filepath
+from core.security import release_concurrency_slot, is_safe_filepath, ssrf_safe_socket
 
 PROGRESS_CACHE = {}
 CANCEL_EVENTS = {}
@@ -329,13 +329,13 @@ def download_task(task_id, url, format_type, quality, download_dir):
             break
 
     # YouTube Cloud Engine:
-    # 'visionos' and 'ios' use native Apple HLS (.m3u8) manifests which completely bypass:
-    # 1. Cloud datacenter bot challenges ("Sign in to confirm you're not a bot")
+    # 'android' and 'ios' native mobile clients bypass:
+    # 1. Web BotGuard / Cloud challenges ("Sign in to confirm you're not a bot")
     # 2. SABR encrypted streaming experiments
-    # 3. Web player JavaScript 'n' challenge requirements
+    # 3. JavaScript n-challenge deciphering failures
     ydl_opts['extractor_args'] = {
         'youtube': {
-            'player_client': ['visionos', 'ios']
+            'player_client': ['android', 'ios']
         }
     }
 
@@ -351,12 +351,12 @@ def download_task(task_id, url, format_type, quality, download_dir):
     else:
         ydl_opts['merge_output_format'] = 'mp4'
         if quality == 'best':
-            ydl_opts['format'] = 'bestvideo+bestaudio/bestvideo+bestaudio/best'
+            ydl_opts['format'] = 'bestvideo+bestaudio/bestvideo+bestaudio/best/b'
         elif quality.isdigit():
             height = quality
-            ydl_opts['format'] = f'bestvideo[height<={height}]+bestaudio/bestvideo+bestaudio/best[height<={height}]/best'
+            ydl_opts['format'] = f'bestvideo[height<={height}]+bestaudio/best[height<={height}]/bestvideo+bestaudio/best/b'
         else:
-            ydl_opts['format'] = 'bestvideo[height<=720]+bestaudio/bestvideo+bestaudio/best[height<=720]/best'
+            ydl_opts['format'] = 'bestvideo[height<=720]+bestaudio/best[height<=720]/bestvideo+bestaudio/best/b'
         
     try:
         # Store metadata as soon as we get it
@@ -382,100 +382,138 @@ def download_task(task_id, url, format_type, quality, download_dir):
         original_hooks = ydl_opts.get('progress_hooks', [])
         ydl_opts['progress_hooks'] = [pre_download_hook] + original_hooks
         
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(target_url, download=True)
-            
-            # Handle playlist/search result dictionary
-            if info.get('_type') == 'playlist' or 'entries' in info:
-                entries = info.get('entries') or []
-                if entries:
-                    info_target = entries[0]
-                else:
-                    raise Exception("No video stream found for the requested ARY link.")
-            else:
-                info_target = info
-            
-            # Use captured metadata or fallback to info target
-            title = ary_title or tiktok_title or metadata.get('title') or info_target.get('title', 'Video')
-            thumbnail = ary_thumbnail or tiktok_thumbnail or metadata.get('thumbnail') or info_target.get('thumbnail')
-            
-            # Locate the actual downloaded media file on disk
-            actual_filepath = None
-            
-            # 1. Check requested_downloads tracked by yt_dlp
-            for source_dict in [info, info_target]:
-                for rd in source_dict.get('requested_downloads', []):
-                    fp = rd.get('filepath')
-                    if fp and os.path.isfile(fp):
-                        actual_filepath = fp
-                        break
-                if actual_filepath:
-                    break
+        # Multi-tier extraction with automatic fallback for bot detection & format missing
+        fallback_strategies = [
+            # Tier 1: Configured options with Android & iOS mobile clients
+            dict(ydl_opts),
+            # Tier 2: Clean Mobile bypass without cookies (bypasses expired cookie poison)
+            {**ydl_opts, 'cookiefile': None, 'extractor_args': {'youtube': {'player_client': ['android', 'ios']}}},
+            # Tier 3: Mobile web fallback with broadest format selector
+            {**ydl_opts, 'cookiefile': None, 'format': 'best/bestvideo+bestaudio', 'extractor_args': {'youtube': {'player_client': ['mweb', 'android']}}}
+        ]
+        
+        for opts in fallback_strategies:
+            if opts.get('cookiefile') is None and 'cookiefile' in opts:
+                del opts['cookiefile']
 
-            # 2. Check standard prepare_filename if not found in requested_downloads
-            if not actual_filepath or not os.path.isfile(actual_filepath):
-                prep_fn = ydl.prepare_filename(info_target)
-                if format_type == 'mp3':
-                    prep_fn = os.path.splitext(prep_fn)[0] + '.mp3'
-                if os.path.isfile(prep_fn):
-                    actual_filepath = prep_fn
-
-            # 3. Resilient directory scan for the unique task_id prefix
-            if not actual_filepath or not os.path.isfile(actual_filepath):
-                for f in os.listdir(download_dir):
-                    if f.startswith(f"{task_id}_") and not (f.endswith('.part') or f.endswith('.temp') or f.endswith('.ytdl')):
-                        candidate = os.path.join(download_dir, f)
-                        if os.path.isfile(candidate):
-                            actual_filepath = candidate
+        info = None
+        last_error = None
+        for attempt_idx, current_opts in enumerate(fallback_strategies):
+            try:
+                with ssrf_safe_socket():
+                    with yt_dlp.YoutubeDL(current_opts) as ydl:
+                        info = ydl.extract_info(target_url, download=True)
+                        if info:
                             break
+            except CancelledError:
+                raise
+            except Exception as e:
+                last_error = e
+                if cancel_event.is_set():
+                    raise CancelledError("User requested cancellation")
+                err_str = str(e).lower()
+                bot_or_format_issues = ['sign in', 'bot', 'cookie', 'format', '429', 'unavailable', 'po_token', 'reloaded']
+                if any(k in err_str for k in bot_or_format_issues) and attempt_idx < len(fallback_strategies) - 1:
+                    print(f"Extraction tier {attempt_idx+1} hit issue ({e}). Retrying with fallback client...")
+                    time.sleep(0.5)
+                    continue
+                else:
+                    raise e
 
-            if not actual_filepath or not os.path.isfile(actual_filepath):
-                raise Exception("Download failed: Resulting media file was not found on server.")
-
-            # Sanitize title and rename to clean safe file name
-            safe_title = re.sub(r'[\\/*?:"<>|]', "", title).strip() or "video"
-            safe_title = re.sub(r'\s+', ' ', safe_title)[:80]
-            _, actual_ext = os.path.splitext(actual_filepath)
+        if not info and last_error:
+            raise last_error
             
-            desired_filename = os.path.join(download_dir, f"{task_id}_{safe_title}{actual_ext}")
-            final_filepath = actual_filepath
-            if os.path.abspath(actual_filepath) != os.path.abspath(desired_filename):
+        # Handle playlist/search result dictionary
+        if info.get('_type') == 'playlist' or 'entries' in info:
+            entries = info.get('entries') or []
+            if entries:
+                info_target = entries[0]
+            else:
+                raise Exception("No video stream found for the requested link.")
+        else:
+            info_target = info
+            
+        # Use captured metadata or fallback to info target
+        title = ary_title or tiktok_title or metadata.get('title') or info_target.get('title', 'Video')
+        thumbnail = ary_thumbnail or tiktok_thumbnail or metadata.get('thumbnail') or info_target.get('thumbnail')
+        
+        # Locate the actual downloaded media file on disk
+        actual_filepath = None
+        
+        # 1. Check requested_downloads tracked by yt_dlp
+        for source_dict in [info, info_target]:
+            for rd in source_dict.get('requested_downloads', []):
+                fp = rd.get('filepath')
+                if fp and os.path.isfile(fp):
+                    actual_filepath = fp
+                    break
+            if actual_filepath:
+                break
+
+        # 2. Check standard prepare_filename if not found in requested_downloads
+        if not actual_filepath or not os.path.isfile(actual_filepath):
+            prep_fn = ydl.prepare_filename(info_target)
+            if format_type == 'mp3':
+                prep_fn = os.path.splitext(prep_fn)[0] + '.mp3'
+            if os.path.isfile(prep_fn):
+                actual_filepath = prep_fn
+
+        # 3. Resilient directory scan for the unique task_id prefix
+        if not actual_filepath or not os.path.isfile(actual_filepath):
+            for f in os.listdir(download_dir):
+                if f.startswith(f"{task_id}_") and not (f.endswith('.part') or f.endswith('.temp') or f.endswith('.ytdl')):
+                    candidate = os.path.join(download_dir, f)
+                    if os.path.isfile(candidate):
+                        actual_filepath = candidate
+                        break
+
+        if not actual_filepath or not os.path.isfile(actual_filepath):
+            raise Exception("Download failed: Resulting media file was not found on server.")
+
+        # Sanitize title and rename to clean safe file name
+        safe_title = re.sub(r'[\\/*?:"<>|]', "", title).strip() or "video"
+        safe_title = re.sub(r'\s+', ' ', safe_title)[:80]
+        _, actual_ext = os.path.splitext(actual_filepath)
+        
+        desired_filename = os.path.join(download_dir, f"{task_id}_{safe_title}{actual_ext}")
+        final_filepath = actual_filepath
+        if os.path.abspath(actual_filepath) != os.path.abspath(desired_filename):
+            try:
+                if os.path.exists(desired_filename):
+                    os.remove(desired_filename)
+                os.rename(actual_filepath, desired_filename)
+                final_filepath = desired_filename
+            except Exception as e:
+                print("Rename notice:", e)
+                final_filepath = actual_filepath
+
+        # Security: Path Traversal Defense
+        if not is_safe_filepath(final_filepath, download_dir):
+            if os.path.exists(final_filepath):
                 try:
-                    if os.path.exists(desired_filename):
-                        os.remove(desired_filename)
-                    os.rename(actual_filepath, desired_filename)
-                    final_filepath = desired_filename
-                except Exception as e:
-                    print("Rename notice:", e)
-                    final_filepath = actual_filepath
-
-            # Security: Path Traversal Defense
-            if not is_safe_filepath(final_filepath, download_dir):
-                if os.path.exists(final_filepath):
-                    try:
-                        os.remove(final_filepath)
-                    except Exception:
-                        pass
-                raise Exception("Target path traversal blocked.")
-
-            # Security: Validate file extension against allowed media extensions
-            allowed_exts = ['.mp4', '.mp3', '.m4a', '.webm', '.mkv', '.avi', '.mov', '.flv']
-            _, ext = os.path.splitext(final_filepath)
-            if ext.lower() not in allowed_exts:
-                if os.path.exists(final_filepath):
                     os.remove(final_filepath)
-                raise Exception("Downloaded file type is not an allowed media format.")
+                except Exception:
+                    pass
+            raise Exception("Target path traversal blocked.")
 
-            with CACHE_LOCK:
-                PROGRESS_CACHE[task_id] = {
-                    'status': 'finished',
-                    'filepath': final_filepath,
-                    'filename': os.path.basename(final_filepath),
-                    'task_id': task_id,
-                    'timestamp': time.time(),
-                    'title': title,
-                    'thumbnail': thumbnail
-                }
+        # Security: Validate file extension against allowed media extensions
+        allowed_exts = ['.mp4', '.mp3', '.m4a', '.webm', '.mkv', '.avi', '.mov', '.flv']
+        _, ext = os.path.splitext(final_filepath)
+        if ext.lower() not in allowed_exts:
+            if os.path.exists(final_filepath):
+                os.remove(final_filepath)
+            raise Exception("Downloaded file type is not an allowed media format.")
+
+        with CACHE_LOCK:
+            PROGRESS_CACHE[task_id] = {
+                'status': 'finished',
+                'filepath': final_filepath,
+                'filename': os.path.basename(final_filepath),
+                'task_id': task_id,
+                'timestamp': time.time(),
+                'title': title,
+                'thumbnail': thumbnail
+            }
     except CancelledError:
         with CACHE_LOCK:
             PROGRESS_CACHE[task_id] = {

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    
+    <title>{% block title %}Stellar Tech Blog | Guides, Video Tutorials & Streaming Tips{% endblock %}</title>
+    
+    <!-- SEO & Social Meta Tags -->
+    <meta name="description" content="{% block meta_description %}High-quality tutorials, tech guides, and updates on video downloading, audio extraction, and streaming media.{% endblock %}">
+    <link rel="canonical" href="{% block canonical_url %}{{ request.base_url }}{% endblock %}">
+    {% block robots_meta %}<meta name="robots" content="index, follow">{% endblock %}
+
+    <!-- Open Graph -->
+    <meta property="og:site_name" content="Stellar Studio">
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+    <meta property="og:title" content="{% block og_title %}{{ self.title() }}{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}{{ self.meta_description() }}{% endblock %}">
+    <meta property="og:url" content="{{ request.base_url }}">
+    <meta property="og:image" content="{% block og_image %}{{ url_for('static', filename='img/og-default.jpg', _external=True) }}{% endblock %}">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ self.title() }}">
+    <meta name="twitter:description" content="{{ self.meta_description() }}">
+    <meta name="twitter:image" content="{{ self.og_image() }}">
+
+    <!-- Google Fonts & Font Awesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Blog Stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/blog.css') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="blog-body">
+
+    <!-- Global Top Navigation Header -->
+    <header class="site-nav">
+        <div class="blog-container nav-wrapper">
+            <a href="{{ url_for('index') }}" class="brand-link">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-bolt"></i>
+                </div>
+                <div class="brand-title-wrap">
+                    <h1>{{ settings.site_title }}</h1>
+                    <span>v2.0</span>
+                </div>
+            </a>
+
+            <!-- Mobile Menu Toggle Button -->
+            <button class="mobile-toggle" id="mobileNavToggle" aria-label="Toggle Navigation">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+
+            <!-- Navigation Links -->
+            <ul class="nav-menu" id="navMenu">
+                <li><a href="{{ url_for('blog.blog_index') }}" class="nav-link {% if request.endpoint == 'blog.blog_index' %}active{% endif %}"><i class="fa-solid fa-newspaper"></i> Blog</a></li>
+                <li><a href="{{ url_for('blog.about_page') }}" class="nav-link {% if request.endpoint == 'blog.about_page' %}active{% endif %}">About</a></li>
+                <li><a href="{{ url_for('blog.contact_page') }}" class="nav-link {% if request.endpoint == 'blog.contact_page' %}active{% endif %}">Contact</a></li>
+                {% if current_user %}
+                <li><a href="{{ url_for('admin.dashboard') }}" class="nav-link" style="color: var(--accent-mint); font-weight:700;"><i class="fa-solid fa-gauge-high"></i> Admin</a></li>
+                {% endif %}
+                <li><a href="{{ url_for('index') }}" class="nav-link nav-cta-btn"><i class="fa-solid fa-download"></i> Free Downloader</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <!-- Mobile Menu Backdrop -->
+    <div id="mobileMenuBackdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:95;"></div>
+
+    <!-- Flash Messages Container -->
+    <div class="blog-container" style="margin-top: 20px;">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'success' if category == 'success' else 'error' }}">
+                        <i class="fa-solid {{ 'fa-circle-check' if category == 'success' else 'fa-circle-exclamation' }}"></i>
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Main Page Content Block -->
+    <main style="flex: 1;">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Global Clean Footer -->
+    <footer class="site-footer">
+        <div class="blog-container">
+            <div class="footer-inner">
+                <div class="footer-brand">
+                    <div class="brand-icon" style="width: 32px; height: 32px; font-size: 14px; border-radius: 9px;">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <span style="font-family: var(--font-display); font-weight: 800; font-size: 16px; color: #ffffff;">{{ settings.site_title }}</span>
+                </div>
+
+                <div class="footer-nav-links">
+                    <a href="{{ url_for('index') }}">Downloader</a>
+                    <a href="{{ url_for('blog.blog_index') }}">Blog</a>
+                    <a href="{{ url_for('blog.about_page') }}">About</a>
+                    <a href="{{ url_for('blog.contact_page') }}">Contact</a>
+                    <a href="{{ url_for('blog.privacy_page') }}">Privacy Policy</a>
+                    <a href="{{ url_for('blog.terms_page') }}">Terms of Service</a>
+                    <a href="{{ url_for('blog.disclaimer_page') }}">Disclaimer</a>
+                </div>
+
+                <div class="footer-copy">
+                    {{ settings.footer_copyright }}
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Mobile Nav Toggle JS -->
+    <script>
+        (function() {
+            const toggle = document.getElementById('mobileNavToggle');
+            const menu = document.getElementById('navMenu');
+            const backdrop = document.getElementById('mobileMenuBackdrop');
+            if (toggle && menu) {
+                toggle.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const isOpen = menu.classList.toggle('open');
+                    if (backdrop) backdrop.style.display = isOpen ? 'block' : 'none';
+                });
+                if (backdrop) {
+                    backdrop.addEventListener('click', function() {
+                        menu.classList.remove('open');
+                        backdrop.style.display = 'none';
+                    });
+                }
+            }
+        })();
+    </script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

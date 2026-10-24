@@ -1,0 +1,58 @@
+{% extends "blog/base.html" %}
+
+{% block title %}Contact Support | Stellar Studio{% endblock %}
+{% block meta_description %}Get in touch with the Stellar Studio team for support, feature requests, or business inquiries.{% endblock %}
+
+{% block content %}
+<div class="blog-container">
+    <div class="static-page-wrap">
+        <nav class="breadcrumbs" aria-label="Breadcrumb" style="margin-bottom: 24px;">
+            <a href="{{ url_for('index') }}"><i class="fa-solid fa-house"></i> Home</a>
+            <span>/</span>
+            <span style="color: var(--accent-mint);">Contact Us</span>
+        </nav>
+
+        <h1>Contact Us</h1>
+        <p style="color: var(--text-muted); font-size: 1.05rem;">
+            Have a question, encountered an unsupported video URL, or want to submit an article suggestion? Reach out to our team using the form below.
+        </p>
+
+        <!-- Direct Email Card -->
+        <div style="margin: 28px 0; padding: 18px 24px; background: var(--bg-deep); border-radius: var(--radius-sm); border: 1px solid var(--border-forest); display: flex; align-items: center; gap: 16px;">
+            <div style="font-size: 24px; color: var(--accent-mint);"><i class="fa-solid fa-envelope-open-text"></i></div>
+            <div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Direct Email Support</div>
+                <div style="font-weight: 700; color: #ffffff;">{{ contact_email or 'support@aryplusdownloader.tech' }}</div>
+            </div>
+        </div>
+
+        <form action="{{ url_for('blog.contact_page') }}" method="POST" class="contact-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="form-group">
+                <label for="contact_name">Your Full Name *</label>
+                <input type="text" id="contact_name" name="name" class="form-control" placeholder="Muhammad Ali" required>
+            </div>
+
+            <div class="form-group">
+                <label for="contact_email">Email Address *</label>
+                <input type="email" id="contact_email" name="email" class="form-control" placeholder="ali@example.com" required>
+            </div>
+
+            <div class="form-group">
+                <label for="contact_subject">Subject</label>
+                <input type="text" id="contact_subject" name="subject" class="form-control" placeholder="Video Link Extraction / Feedback">
+            </div>
+
+            <div class="form-group">
+                <label for="contact_message">Your Message *</label>
+                <textarea id="contact_message" name="message" class="form-control" rows="5" placeholder="Describe your question or provide the video link..." required></textarea>
+            </div>
+
+            <button type="submit" class="btn-primary" style="margin-top: 10px;">
+                <i class="fa-solid fa-paper-plane"></i> Send Message
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

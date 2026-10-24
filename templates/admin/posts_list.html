@@ -1,0 +1,232 @@
+{% extends "admin/base.html" %}
+
+{% set active_page = 'posts' %}
+{% block page_title %}Articles Management{% endblock %}
+
+{% block content %}
+<!-- Elevated SaaS App Sheet -->
+<div class="cms-sheet">
+
+    <!-- Top Sheet Header -->
+    <div class="cms-sheet-header">
+        <div class="cms-title-wrap">
+            <div class="brand-icon" style="width: 44px; height: 44px; font-size: 18px; border-radius: 12px;">
+                <i class="fa-solid fa-newspaper"></i>
+            </div>
+            <div>
+                <h1 class="cms-title">Articles Management</h1>
+            </div>
+        </div>
+
+        <div class="cms-actions-group">
+            <a href="{{ url_for('admin.post_new') }}" class="btn-dark-pill">
+                <i class="fa-solid fa-plus"></i>
+                <span>Write New Article</span>
+            </a>
+
+            <a href="{{ url_for('blog.index') }}" target="_blank" class="btn-white-pill">
+                <i class="fa-solid fa-arrow-up-right-from-square" style="color: var(--admin-text-muted);"></i>
+                <span>Preview Blog</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Section Filter & Search Bar -->
+    <div style="padding: 24px 32px 16px;">
+        <form method="GET" action="{{ url_for('admin.posts_list') }}" class="filter-bar" style="width: 100%;">
+            <div style="position: relative; flex: 1 1 260px;">
+                <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--admin-text-dim); font-size: 14px;"></i>
+                <input type="text" name="q" value="{{ search_query }}" placeholder="Search articles by title or slug..." class="table-search-input" style="width: 100%;">
+            </div>
+
+            <select name="status" class="select-filter" onchange="this.form.submit()">
+                <option value="">All Statuses</option>
+                <option value="published" {% if selected_status == 'published' %}selected{% endif %}>Published</option>
+                <option value="draft" {% if selected_status == 'draft' %}selected{% endif %}>Drafts</option>
+                <option value="scheduled" {% if selected_status == 'scheduled' %}selected{% endif %}>Scheduled</option>
+            </select>
+
+            <select name="category_id" class="select-filter" onchange="this.form.submit()">
+                <option value="">All Categories</option>
+                {% for cat in categories %}
+                    <option value="{{ cat.id }}" {% if selected_category == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                {% endfor %}
+            </select>
+
+            <div style="display: flex; gap: 8px;">
+                <button type="submit" class="btn-dark-pill" style="padding: 8px 18px; font-size: 0.88rem;">
+                    <i class="fa-solid fa-filter"></i>
+                    <span>Filter</span>
+                </button>
+
+                {% if search_query or selected_status or selected_category %}
+                    <a href="{{ url_for('admin.posts_list') }}" class="btn-white-pill" style="padding: 8px 14px; font-size: 0.88rem;">
+                        <i class="fa-solid fa-xmark"></i>
+                        <span>Clear</span>
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- Nested Card: Articles Table -->
+    <div class="nested-card">
+        <div class="nested-card-title">
+            <span class="badge-circle-num">{{ total_posts }}</span>
+            <span>Articles Directory</span>
+        </div>
+
+        {% if posts %}
+            <div class="table-responsive">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th style="min-width: 280px;">Article Title</th>
+                            <th>Category</th>
+                            <th>Status</th>
+                            <th>Author</th>
+                            <th>Date</th>
+                            <th>Views</th>
+                            <th style="text-align: right; min-width: 140px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for post in posts %}
+                            <tr>
+                                <td>
+                                    <div style="display: flex; align-items: center; gap: 14px;">
+                                        {% if post.featured_image %}
+                                            <img src="{{ post.featured_image }}" alt="" style="width: 44px; height: 44px; border-radius: 10px; object-fit: cover; border: 1px solid var(--admin-border); flex-shrink: 0;">
+                                        {% else %}
+                                            <div style="width: 44px; height: 44px; border-radius: 10px; background: var(--admin-subtle); border: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: center; color: var(--admin-text-dim); flex-shrink: 0;">
+                                                <i class="fa-solid fa-image"></i>
+                                            </div>
+                                        {% endif %}
+                                        <div style="min-width: 0;">
+                                            <a href="{{ url_for('admin.post_edit', post_id=post.id) }}" style="color: var(--admin-text-main); font-weight: 700; text-decoration: none; font-size: 0.95rem; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;">
+                                                {{ post.title }}
+                                            </a>
+                                            <div style="color: var(--admin-text-muted); font-size: 0.75rem; margin-top: 2px;">
+                                                /blog/{{ post.slug }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span style="font-size: 0.85rem; color: var(--admin-text-body); font-weight: 600;">
+                                        {{ post.category_name or 'Uncategorized' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if post.status == 'published' %}
+                                        <span class="status-badge published"><i class="fa-solid fa-check"></i> Published</span>
+                                    {% elif post.status == 'draft' %}
+                                        <span class="status-badge draft"><i class="fa-solid fa-pen"></i> Draft</span>
+                                    {% elif post.status == 'scheduled' %}
+                                        <span class="status-badge scheduled" title="Scheduled for {{ post.scheduled_for }}"><i class="fa-solid fa-clock"></i> Scheduled</span>
+                                    {% endif %}
+                                </td>
+                                <td style="color: var(--admin-text-muted); font-size: 0.85rem;">
+                                    {{ post.author_name or 'Admin' }}
+                                </td>
+                                <td style="color: var(--admin-text-muted); font-size: 0.82rem; white-space: nowrap;">
+                                    {% if post.status == 'published' and post.published_at %}
+                                        {{ post.published_at[:10] }}
+                                    {% elif post.status == 'scheduled' and post.scheduled_for %}
+                                        <span style="color: #b45309; font-weight: 700;">{{ post.scheduled_for[:16] }}</span>
+                                    {% else %}
+                                        {{ post.created_at[:10] if post.created_at else '—' }}
+                                    {% endif %}
+                                </td>
+                                <td style="font-weight: 700; color: var(--admin-primary); font-size: 0.9rem;">
+                                    {{ post.views_count }}
+                                </td>
+                                <td>
+                                    <div class="action-btns" style="justify-content: flex-end;">
+                                        <!-- Toggle Status Button -->
+                                        <form method="POST" action="{{ url_for('admin.post_toggle_status', post_id=post.id) }}" style="display:inline;" title="Toggle Draft / Published">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn-icon" style="cursor: pointer;">
+                                                {% if post.status == 'published' %}
+                                                    <i class="fa-solid fa-eye-slash" title="Unpublish (Revert to Draft)"></i>
+                                                {% else %}
+                                                    <i class="fa-solid fa-check-double" title="Quick Publish"></i>
+                                                {% endif %}
+                                            </button>
+                                        </form>
+
+                                        <!-- Live View -->
+                                        <a href="{{ url_for('blog.post_detail', slug=post.slug) }}" target="_blank" class="btn-icon" title="View Article / Preview">
+                                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                        </a>
+
+                                        <!-- Edit Post -->
+                                        <a href="{{ url_for('admin.post_edit', post_id=post.id) }}" class="btn-icon" title="Edit Article">
+                                            <i class="fa-solid fa-pen-to-square"></i>
+                                        </a>
+
+                                        <!-- Delete Post -->
+                                        <form method="POST" action="{{ url_for('admin.post_delete', post_id=post.id) }}" style="display:inline;" onsubmit="return confirm('Are you sure you want to permanently delete &quot;{{ post.title }}&quot;?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn-icon danger" title="Delete Article" style="color: #dc2626 !important; background: #fee2e2 !important; border: 1px solid #fca5a5 !important; cursor: pointer;">
+                                                <i class="fa-solid fa-trash-can" style="color: #dc2626 !important;"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination Controls -->
+            {% if total_pages > 1 %}
+                <div style="padding: 18px 24px; border-top: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+                    <div style="color: var(--admin-text-muted); font-size: 0.85rem;">
+                        Showing page {{ current_page }} of {{ total_pages }} ({{ total_posts }} total articles)
+                    </div>
+
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        {% if current_page > 1 %}
+                            <a href="{{ url_for('admin.posts_list', page=current_page-1, q=search_query, status=selected_status, category_id=selected_category) }}" class="btn-icon" title="Previous Page">
+                                <i class="fa-solid fa-chevron-left"></i>
+                            </a>
+                        {% endif %}
+
+                        {% for p in range(1, total_pages + 1) %}
+                            {% if p == current_page %}
+                                <span style="width: 32px; height: 32px; border-radius: 8px; background: var(--admin-primary); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.85rem;">{{ p }}</span>
+                            {% elif p <= 3 or p >= total_pages - 2 or (p >= current_page - 1 and p <= current_page + 1) %}
+                                <a href="{{ url_for('admin.posts_list', page=p, q=search_query, status=selected_status, category_id=selected_category) }}" class="btn-icon">
+                                    {{ p }}
+                                </a>
+                            {% elif p == 4 or p == total_pages - 3 %}
+                                <span style="color: var(--admin-text-dim); display: flex; align-items: center; justify-content: center; width: 20px;">...</span>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if current_page < total_pages %}
+                            <a href="{{ url_for('admin.posts_list', page=current_page+1, q=search_query, status=selected_status, category_id=selected_category) }}" class="btn-icon" title="Next Page">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+
+        {% else %}
+            <div style="padding: 56px 24px; text-align: center; color: var(--admin-text-muted);">
+                <div style="font-size: 42px; margin-bottom: 12px; opacity: 0.4;"><i class="fa-solid fa-magnifying-glass"></i></div>
+                <h3 style="color: var(--admin-text-main); font-size: 1.15rem; margin-bottom: 6px;">No articles found</h3>
+                <p style="font-size: 0.9rem; margin-bottom: 20px;">Try adjusting your search criteria or write a new article.</p>
+                <a href="{{ url_for('admin.post_new') }}" class="btn-dark-pill" style="display: inline-flex;">
+                    <i class="fa-solid fa-pen-nib"></i>
+                    <span>Write New Article</span>
+                </a>
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

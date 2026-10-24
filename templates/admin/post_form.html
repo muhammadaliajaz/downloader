@@ -1,0 +1,644 @@
+{% extends "admin/base.html" %}
+
+{% set active_page = 'post_new' if not is_edit else 'posts' %}
+{% block page_title %}{{ 'Edit Article' if is_edit else 'Article Editor' }}{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
+<style>
+    .seo-drawer {
+        background: #fbfdfc;
+        border: 1px solid var(--admin-border);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+        margin-top: 16px;
+    }
+    .seo-drawer-header {
+        padding: 14px 18px;
+        background: #f3f6f4;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: var(--admin-text-main);
+    }
+    .seo-drawer-body {
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+    .char-count {
+        font-size: 0.75rem;
+        color: var(--admin-text-muted);
+        text-align: right;
+        margin-top: 4px;
+    }
+    .media-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(17, 24, 39, 0.5);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        z-index: 1100;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+    }
+    .media-modal-box {
+        background: #ffffff;
+        border: 1px solid var(--admin-border);
+        border-radius: var(--radius-xl);
+        width: min(780px, 95vw);
+        max-height: 85vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: var(--shadow-floating);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Elevated SaaS App Sheet (Matching Reference Screenshot) -->
+<div class="cms-sheet">
+
+    <!-- Top Sheet Header (Replica of Screenshot) -->
+    <div class="cms-sheet-header">
+        <div class="cms-title-wrap">
+            <div class="brand-icon" style="width: 44px; height: 44px; font-size: 18px; border-radius: 12px;">
+                <i class="fa-solid fa-pen-nib"></i>
+            </div>
+            <div>
+                <h1 class="cms-title">{{ 'Edit Article' if is_edit else 'Article Editor' }}</h1>
+            </div>
+        </div>
+
+        <div class="cms-actions-group">
+            <button type="button" class="btn-dark-pill" onclick="triggerMainSubmit()">
+                <i class="fa-solid fa-floppy-disk"></i>
+                <span id="sheetSubmitText">{{ 'Review and publish' if not is_edit else 'Update & Publish' }}</span>
+                <i class="fa-solid fa-chevron-down" style="font-size: 11px; opacity: 0.8;"></i>
+            </button>
+
+            {% if is_edit and post.slug %}
+                <a href="{{ url_for('blog.post_detail', slug=post.slug) }}" target="_blank" class="btn-white-pill">
+                    <span>Preview</span>
+                    <i class="fa-solid fa-chevron-down" style="font-size: 11px; opacity: 0.7;"></i>
+                </a>
+            {% endif %}
+
+            {% if is_edit and post.id %}
+                <button type="button" class="btn-white-pill" style="color: #dc2626 !important; border-color: #fca5a5; background: #fff5f5; font-weight: 700;" onclick="confirmDeleteCurrentPost()">
+                    <i class="fa-solid fa-trash-can" style="color: #dc2626 !important;"></i>
+                    <span>Delete Article</span>
+                </button>
+            {% endif %}
+
+            <a href="{{ url_for('admin.posts_list') }}" class="btn-white-pill">
+                <span>All Articles</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Editor Body Container -->
+    <div style="padding: 28px 32px 32px;">
+        <form id="postForm" method="POST" enctype="multipart/form-data" action="{{ url_for('admin.post_edit', post_id=post.id) if is_edit else url_for('admin.post_create') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="content" id="hiddenContent">
+
+            <div class="post-form-layout">
+                <!-- Main Writing Column -->
+                <div class="editor-main-panel">
+                    <!-- Article Title -->
+                    <div>
+                        <input type="text" id="postTitle" name="title" value="{{ post.title or '' }}" placeholder="Enter article title here..." class="input-title" required autofocus>
+                        
+                        <!-- Slug & URL preview -->
+                        <div class="permalink-row">
+                            <span style="font-weight: 600;">Permalink: /blog/</span>
+                            <input type="text" id="postSlug" name="slug" value="{{ post.slug or '' }}" placeholder="article-url-slug" class="form-input" style="padding: 6px 12px; font-size: 0.85rem; max-width: 260px; font-family: monospace;">
+                            <button type="button" id="slugLockBtn" class="btn-icon" style="width: 30px; height: 30px; font-size: 12px;" title="Auto-sync from title">
+                                <i class="fa-solid fa-link"></i>
+                            </button>
+                            {% if is_edit and post.slug %}
+                                <a href="{{ url_for('blog.post_detail', slug=post.slug) }}" target="_blank" style="color: var(--admin-primary); margin-left: 6px; font-size: 0.85rem; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Preview
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- WYSIWYG Editor (Quill.js) -->
+                    <div class="form-card" style="padding: 0; overflow: hidden;">
+                        <div id="quill-toolbar">
+                            <span class="ql-formats">
+                                <select class="ql-header">
+                                    <option selected>Normal Text</option>
+                                    <option value="2">Heading 2</option>
+                                    <option value="3">Heading 3</option>
+                                    <option value="4">Heading 4</option>
+                                </select>
+                            </span>
+                            <span class="ql-formats">
+                                <button class="ql-bold"></button>
+                                <button class="ql-italic"></button>
+                                <button class="ql-underline"></button>
+                                <button class="ql-strike"></button>
+                            </span>
+                            <span class="ql-formats">
+                                <button class="ql-blockquote"></button>
+                                <button class="ql-code-block"></button>
+                            </span>
+                            <span class="ql-formats">
+                                <button class="ql-list" value="ordered"></button>
+                                <button class="ql-list" value="bullet"></button>
+                            </span>
+                            <span class="ql-formats">
+                                <button class="ql-link"></button>
+                                <button class="ql-image"></button>
+                                <button class="ql-video"></button>
+                            </span>
+                            <span class="ql-formats">
+                                <button class="ql-clean"></button>
+                            </span>
+                        </div>
+                        <div id="quill-editor">{{ post.content|safe if post.content else '' }}</div>
+                    </div>
+
+                    <!-- Excerpt field -->
+                    <div class="form-card">
+                        <div class="form-card-title">
+                            <i class="fa-solid fa-quote-left" style="color: var(--admin-primary);"></i>
+                            <span>Article Excerpt (Summary)</span>
+                        </div>
+                        <textarea name="excerpt" id="postExcerpt" rows="3" class="form-textarea" placeholder="Brief summary of article shown on cards and RSS feeds. Leave empty to automatically generate from content.">{{ post.excerpt or '' }}</textarea>
+                        <div class="char-count" id="excerptCount">0 / 250 characters</div>
+                    </div>
+
+                    <!-- Advanced Search Engine Optimization (SEO) Settings -->
+                    <div class="form-card" id="seoDrawerSection">
+                        <div class="form-card-title">
+                            <i class="fa-solid fa-chart-line" style="color: var(--admin-primary);"></i>
+                            <span>Search Engine Optimization (SEO) & Social Sharing</span>
+                        </div>
+
+                        <div class="seo-drawer">
+                            <div class="seo-drawer-header" onclick="toggleSeoDrawer()">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <i class="fa-solid fa-globe" style="color: var(--admin-primary);"></i>
+                                    <span>Search Metadata (Meta Title, Description, Canonical)</span>
+                                </div>
+                                <i class="fa-solid fa-chevron-down" id="seoDrawerIcon"></i>
+                            </div>
+
+                            <div class="seo-drawer-body" id="seoDrawerBody">
+                                <div class="form-group">
+                                    <label class="form-label" for="seo_title">SEO Title (Appears in Google Search)</label>
+                                    <input type="text" id="seo_title" name="seo_title" value="{{ post.seo_title or '' }}" placeholder="Defaults to article title if empty" class="form-input">
+                                    <div class="char-count" id="seoTitleCount">0 / 60 optimal</div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" for="meta_description">Meta Description</label>
+                                    <textarea id="meta_description" name="meta_description" rows="2" placeholder="Compelling summary shown under Google search results..." class="form-textarea">{{ post.meta_description or '' }}</textarea>
+                                    <div class="char-count" id="metaDescCount">0 / 160 optimal</div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" for="canonical_url">Canonical URL</label>
+                                    <input type="url" id="canonical_url" name="canonical_url" value="{{ post.canonical_url or '' }}" placeholder="https://example.com/original-article" class="form-input">
+                                    <div style="font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 4px;">Leave blank to default to this article's permalink.</div>
+                                </div>
+
+                                <hr style="border: 0; border-top: 1px solid var(--admin-border-light); margin: 6px 0;">
+
+                                <div class="form-group">
+                                    <label class="form-label" for="og_title">Open Graph / Twitter Title</label>
+                                    <input type="text" id="og_title" name="og_title" value="{{ post.og_title or '' }}" placeholder="Defaults to SEO title" class="form-input">
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" for="og_description">Open Graph Description</label>
+                                    <textarea id="og_description" name="og_description" rows="2" placeholder="Defaults to Meta Description" class="form-textarea">{{ post.og_description or '' }}</textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" for="og_image">Social Sharing Image URL (og:image)</label>
+                                    <input type="url" id="og_image" name="og_image" value="{{ post.og_image or '' }}" placeholder="Defaults to Featured Image" class="form-input">
+                                </div>
+
+                                <div style="margin-top: 8px;">
+                                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--admin-text-main); font-size: 0.88rem;">
+                                        <input type="checkbox" name="is_noindex" value="1" {% if post.is_noindex %}checked{% endif %} style="width: 18px; height: 18px; accent-color: var(--admin-primary);">
+                                        <span><strong>noindex</strong> (Tell search engines NOT to index this page and exclude from sitemap.xml)</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sidebar Options Column -->
+                <div class="editor-sidebar-panel">
+                    <!-- Publish / Schedule Card -->
+                    <div class="form-card">
+                        <div class="form-card-title">
+                            <i class="fa-solid fa-paper-plane" style="color: var(--admin-primary);"></i>
+                            <span>Publishing Status</span>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 16px;">
+                            <label class="form-label">Status</label>
+                            <select id="postStatusSelect" name="status" class="form-select" onchange="handleStatusChange()">
+                                <option value="draft" {% if post.status == 'draft' or not post.status %}selected{% endif %}>Draft (Unpublished)</option>
+                                <option value="published" {% if post.status == 'published' %}selected{% endif %}>Published (Live now)</option>
+                                <option value="scheduled" {% if post.status == 'scheduled' %}selected{% endif %}>Scheduled (Publish later)</option>
+                            </select>
+                        </div>
+
+                        <!-- Schedule Date Picker -->
+                        <div class="form-group" id="scheduleDateGroup" style="display: {% if post.status == 'scheduled' %}block{% else %}none{% endif %}; margin-bottom: 16px;">
+                            <label class="form-label" for="scheduled_for">Schedule Date & Time</label>
+                            <input type="datetime-local" id="scheduled_for" name="scheduled_for" value="{{ post.scheduled_for.replace(' ', 'T')[:16] if post.scheduled_for else '' }}" class="form-input">
+                            <div style="font-size: 0.75rem; color: #b45309; margin-top: 4px;">
+                                <i class="fa-solid fa-info-circle"></i> Article will automatically go live at this time.
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 16px;">
+                            <label class="form-label" for="author_name">Author Display Name</label>
+                            <input type="text" id="author_name" name="author_name" value="{{ post.author_name or (current_user.display_name if current_user else 'Editorial Team') }}" class="form-input">
+                        </div>
+
+                        {% if is_edit %}
+                            <div style="font-size: 0.8rem; color: var(--admin-text-muted); margin-bottom: 16px; line-height: 1.6;">
+                                <div>Created: {{ post.created_at[:16] if post.created_at else '—' }}</div>
+                                {% if post.updated_at %}
+                                    <div>Updated: {{ post.updated_at[:16] }}</div>
+                                {% endif %}
+                                <div>Total Views: <strong style="color: var(--admin-primary);">{{ post.views_count or 0 }}</strong></div>
+                            </div>
+                        {% endif %}
+
+                        <button type="submit" id="submitBtn" class="btn-dark-pill" style="width: 100%; justify-content: center; padding: 12px; font-size: 0.95rem;">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            <span id="submitBtnText">{{ 'Update Article' if is_edit else 'Save Article' }}</span>
+                        </button>
+                    </div>
+
+                    <!-- Featured Image Card -->
+                    <div class="form-card" id="featuredImageCard">
+                        <div class="form-card-title">
+                            <i class="fa-solid fa-image" style="color: var(--admin-primary);"></i>
+                            <span>Featured Image</span>
+                        </div>
+
+                        <div class="featured-img-preview" id="featuredImgPreview">
+                            {% if post.featured_image %}
+                                <img src="{{ post.featured_image }}" alt="Featured Preview" id="featuredImgTag">
+                            {% else %}
+                                <div id="noImgPlaceholder" style="text-align: center; color: var(--admin-text-muted); font-size: 0.85rem;">
+                                    <i class="fa-solid fa-mountain-sun" style="font-size: 32px; margin-bottom: 6px; display: block; opacity: 0.3;"></i>
+                                    <span>No image selected</span>
+                                </div>
+                                <img src="" alt="" id="featuredImgTag" style="display: none;">
+                            {% endif %}
+                        </div>
+
+                        <input type="hidden" name="featured_image" id="featuredImageInput" value="{{ post.featured_image or '' }}">
+
+                        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                            <label class="btn-secondary" style="flex: 1; justify-content: center; font-size: 0.85rem; cursor: pointer;">
+                                <i class="fa-solid fa-upload"></i>
+                                <span>Upload</span>
+                                <input type="file" id="directFeaturedUpload" accept="image/*" style="display: none;" onchange="uploadDirectFeatured(this)">
+                            </label>
+
+                            <button type="button" class="btn-secondary" style="flex: 1; justify-content: center; font-size: 0.85rem;" onclick="openMediaModal()">
+                                <i class="fa-solid fa-folder-open"></i>
+                                <span>Library</span>
+                            </button>
+                        </div>
+
+                        <button type="button" class="btn-secondary danger" id="removeImgBtn" style="width: 100%; justify-content: center; font-size: 0.8rem; {% if not post.featured_image %}display:none;{% endif %}" onclick="removeFeaturedImage()">
+                            <i class="fa-solid fa-trash-can"></i>
+                            <span>Remove Featured Image</span>
+                        </button>
+
+                        <div class="form-group" style="margin-top: 14px;">
+                            <label class="form-label" for="featured_image_alt">Alt Text (Accessibility & SEO)</label>
+                            <input type="text" id="featured_image_alt" name="featured_image_alt" value="{{ post.featured_image_alt or '' }}" placeholder="Describe image content" class="form-input">
+                        </div>
+                    </div>
+
+                    <!-- Category & Tags Card -->
+                    <div class="form-card" id="classificationSection">
+                        <div class="form-card-title">
+                            <i class="fa-solid fa-tags" style="color: var(--admin-primary);"></i>
+                            <span>Classification</span>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 16px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <label class="form-label" style="margin: 0;">Category</label>
+                                <a href="{{ url_for('admin.categories') }}" target="_blank" style="font-size: 0.75rem; color: var(--admin-primary); font-weight: 700; text-decoration: none;">+ Manage</a>
+                            </div>
+                            <select name="category_id" class="form-select" onchange="updateCategoryPill(this)">
+                                <option value="">-- Select Category --</option>
+                                {% for cat in categories %}
+                                    <option value="{{ cat.id }}" {% if post.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="tags">Tags (Comma-separated)</label>
+                            <input type="text" id="tags" name="tags" value="{{ post.tags or '' }}" placeholder="e.g. YouTube, 4K Video, Tutorial" class="form-input">
+                            <div style="font-size: 0.75rem; color: var(--admin-text-muted); margin-top: 4px;">Separate multiple tags with commas.</div>
+                        </div>
+                    </div>
+
+                    {% if is_edit and post.id %}
+                        <!-- Danger Zone: Permanent Article Deletion -->
+                        <div class="form-card" style="border: 1px solid #fecaca; background: #fffdfd; box-shadow: 0 1px 3px rgba(220, 38, 38, 0.05);">
+                            <div class="form-card-title" style="color: #dc2626; border-bottom-color: #fee2e2;">
+                                <i class="fa-solid fa-triangle-exclamation" style="color: #dc2626;"></i>
+                                <span>Danger Zone</span>
+                            </div>
+                            <p style="font-size: 0.8rem; color: var(--admin-text-muted); margin-bottom: 14px; line-height: 1.45;">
+                                Once deleted, this article and its public URL will be permanently removed. This action cannot be reversed.
+                            </p>
+                            <button type="button" onclick="confirmDeleteCurrentPost()" class="btn-secondary danger" style="width: 100%; justify-content: center; padding: 10px; font-weight: 700; color: #dc2626 !important; background: #fee2e2; border-color: #fca5a5;">
+                                <i class="fa-solid fa-trash-can"></i>
+                                <span>Permanently Delete Article</span>
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if is_edit and post.id %}
+    <form id="deleteCurrentPostForm" method="POST" action="{{ url_for('admin.post_delete', post_id=post.id) }}" style="display:none;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
+    <script>
+        function confirmDeleteCurrentPost() {
+            if (confirm("WARNING: Are you sure you want to permanently delete '{{ post.title|replace('\"', '\\\"') }}'? This action cannot be undone.")) {
+                document.getElementById('deleteCurrentPostForm').submit();
+            }
+        }
+    </script>
+{% endif %}
+
+<!-- Media Selection Modal -->
+<div class="media-modal-backdrop" id="mediaModalBackdrop">
+    <div class="media-modal-box">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--admin-border-light); display: flex; align-items: center; justify-content: space-between;">
+            <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--admin-text-main);"><i class="fa-solid fa-photo-film" style="color: var(--admin-primary);"></i> Select Image from Media Library</h3>
+            <button type="button" onclick="closeMediaModal()" class="btn-icon" style="border: none; background: none; font-size: 16px; cursor: pointer;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <div style="padding: 20px; overflow-y: auto; flex: 1;">
+            {% if all_media %}
+                <div class="media-grid" style="grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));">
+                    {% for item in all_media %}
+                        <div class="media-item" onclick="selectMediaImage('{{ item.filepath }}')" style="cursor: pointer;" title="{{ item.original_name }}">
+                            <img src="{{ item.filepath }}" alt="{{ item.original_name }}">
+                            <div class="media-actions" style="opacity: 0.9; background: rgba(17, 24, 39, 0.75);">
+                                <span style="font-size: 0.75rem; color: #fff; font-weight: 700;"><i class="fa-solid fa-check"></i> Choose</span>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div style="text-align: center; color: var(--admin-text-muted); padding: 40px;">
+                    <i class="fa-solid fa-folder-open" style="font-size: 32px; margin-bottom: 10px; opacity: 0.4;"></i>
+                    <p>No media files uploaded yet.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+<script>
+    // Initialize Quill Editor
+    const quill = new Quill('#quill-editor', {
+        theme: 'snow',
+        modules: {
+            toolbar: {
+                container: '#quill-toolbar',
+                handlers: {
+                    image: quillImageHandler
+                }
+            }
+        },
+        placeholder: 'Write your engaging article content here...'
+    });
+
+    // Custom Quill Image Upload Handler
+    function quillImageHandler() {
+        const input = document.createElement('input');
+        input.setAttribute('type', 'file');
+        input.setAttribute('accept', 'image/*');
+        input.click();
+
+        input.onchange = async () => {
+            const file = input.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('csrf_token', '{{ csrf_token() }}');
+
+            try {
+                const res = await fetch("{{ url_for('admin.api_upload_media') }}", {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.url) {
+                    const range = quill.getSelection(true);
+                    quill.insertEmbed(range.index, 'image', data.url);
+                } else {
+                    alert(data.error || 'Failed to upload image.');
+                }
+            } catch (err) {
+                alert('An error occurred during upload.');
+            }
+        };
+    }
+
+    // Direct upload for Featured Image
+    async function uploadDirectFeatured(fileInput) {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('csrf_token', '{{ csrf_token() }}');
+
+        try {
+            const res = await fetch("{{ url_for('admin.api_upload_media') }}", {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (data.url) {
+                setFeaturedImage(data.url);
+            } else {
+                alert(data.error || 'Image upload failed.');
+            }
+        } catch (err) {
+            alert('Upload request failed.');
+        }
+    }
+
+    function setFeaturedImage(url) {
+        document.getElementById('featuredImageInput').value = url;
+        const img = document.getElementById('featuredImgTag');
+        img.src = url;
+        img.style.display = 'block';
+        document.getElementById('noImgPlaceholder').style.display = 'none';
+        document.getElementById('removeImgBtn').style.display = 'inline-flex';
+    }
+
+    function removeFeaturedImage() {
+        document.getElementById('featuredImageInput').value = '';
+        const img = document.getElementById('featuredImgTag');
+        img.src = '';
+        img.style.display = 'none';
+        document.getElementById('noImgPlaceholder').style.display = 'block';
+        document.getElementById('removeImgBtn').style.display = 'none';
+    }
+
+    // Media Modal
+    function openMediaModal() {
+        document.getElementById('mediaModalBackdrop').style.display = 'flex';
+    }
+    function closeMediaModal() {
+        document.getElementById('mediaModalBackdrop').style.display = 'none';
+    }
+    function selectMediaImage(url) {
+        setFeaturedImage(url);
+        closeMediaModal();
+    }
+
+    // Auto-slug generator
+    let autoSlug = {{ 'false' if is_edit else 'true' }};
+    const titleInput = document.getElementById('postTitle');
+    const slugInput = document.getElementById('postSlug');
+    const slugLockBtn = document.getElementById('slugLockBtn');
+
+    function slugify(text) {
+        return text.toString().toLowerCase()
+            .replace(/\s+/g, '-')
+            .replace(/[^\w\-]+/g, '')
+            .replace(/\-\-+/g, '-')
+            .replace(/^-+/, '')
+            .replace(/-+$/, '');
+    }
+
+    titleInput.addEventListener('input', () => {
+        if (autoSlug) {
+            slugInput.value = slugify(titleInput.value);
+        }
+    });
+
+    slugInput.addEventListener('input', () => {
+        autoSlug = false;
+        slugLockBtn.style.color = 'var(--admin-text-dim)';
+    });
+
+    slugLockBtn.addEventListener('click', () => {
+        autoSlug = true;
+        slugInput.value = slugify(titleInput.value);
+        slugLockBtn.style.color = 'var(--admin-primary)';
+    });
+
+    // Top button trigger
+    function triggerMainSubmit() {
+        document.getElementById('postForm').requestSubmit();
+    }
+
+    // Status change listener
+    function handleStatusChange() {
+        const sel = document.getElementById('postStatusSelect');
+        const status = sel.value;
+        const schedGroup = document.getElementById('scheduleDateGroup');
+        const submitText = document.getElementById('submitBtnText');
+        const sheetSubmitText = document.getElementById('sheetSubmitText');
+
+        if (status === 'scheduled') {
+            schedGroup.style.display = 'block';
+            submitText.innerText = 'Schedule Publication';
+            if (sheetSubmitText) sheetSubmitText.innerText = 'Schedule Publication';
+        } else if (status === 'published') {
+            schedGroup.style.display = 'none';
+            submitText.innerText = 'Publish Now';
+            if (sheetSubmitText) sheetSubmitText.innerText = 'Publish Now';
+        } else {
+            schedGroup.style.display = 'none';
+            submitText.innerText = 'Save as Draft';
+            if (sheetSubmitText) sheetSubmitText.innerText = 'Save as Draft';
+        }
+    }
+
+    // SEO Drawer Toggle
+    let seoOpen = false;
+    function toggleSeoDrawer() {
+        const body = document.getElementById('seoDrawerBody');
+        const icon = document.getElementById('seoDrawerIcon');
+        seoOpen = !seoOpen;
+        if (seoOpen) {
+            body.style.display = 'flex';
+            icon.className = 'fa-solid fa-chevron-up';
+        } else {
+            body.style.display = 'none';
+            icon.className = 'fa-solid fa-chevron-down';
+        }
+    }
+
+    function openSeoDrawerTab() {
+        const body = document.getElementById('seoDrawerBody');
+        const icon = document.getElementById('seoDrawerIcon');
+        seoOpen = true;
+        body.style.display = 'flex';
+        icon.className = 'fa-solid fa-chevron-up';
+    }
+
+    // Initially closed
+    document.getElementById('seoDrawerBody').style.display = 'none';
+
+    // Character counters
+    function setupCharCounter(inputId, counterId, max) {
+        const el = document.getElementById(inputId);
+        const count = document.getElementById(counterId);
+        if (!el || !count) return;
+        const update = () => {
+            count.innerText = `${el.value.length} / ${max} characters`;
+        };
+        el.addEventListener('input', update);
+        update();
+    }
+    setupCharCounter('postExcerpt', 'excerptCount', 250);
+    setupCharCounter('seo_title', 'seoTitleCount', 60);
+    setupCharCounter('meta_description', 'metaDescCount', 160);
+
+    // Sync Quill HTML to hidden input before form submit
+    document.getElementById('postForm').addEventListener('submit', function() {
+        document.getElementById('hiddenContent').value = quill.root.innerHTML;
+    });
+</script>
+{% endblock %}

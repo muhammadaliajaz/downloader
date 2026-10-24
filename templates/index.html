@@ -5,39 +5,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <!-- SEO Primary Meta Tags -->
-    <title>Stellar Video Downloader | Free 4K Video &amp; MP3 Link Extractor</title>
-    <meta name="title" content="Stellar Video Downloader | Free 4K Video &amp; MP3 Link Extractor">
-    <meta name="description"
-        content="Download videos from ARY Plus dramas, YouTube, Instagram, Facebook, and TikTok instantly. High-quality 4K extraction, lightning-fast MP3 conversion, and 100% secure. No registration required.">
-    <meta name="keywords"
-        content="stellar video downloader, stellar studio, video downloader, youtube downloader, tiktok downloader, instagram downloader, facebook video downloader, mp3 converter, link extractor, 4k video download, ary plus drama download">
-    <meta name="author" content="Stellar Downloader">
+    <title>{{ settings.site_title }} | {{ settings.site_tagline }}</title>
+    <meta name="title" content="{{ settings.site_title }} | {{ settings.site_tagline }}">
+    <meta name="description" content="{{ settings.site_description }}">
+    <meta name="keywords" content="video downloader, youtube downloader, tiktok downloader, instagram downloader, facebook video downloader, mp3 converter, link extractor, 4k video download, ary plus drama download">
+    <meta name="author" content="{{ settings.site_title }}">
     <meta name="robots" content="index, follow">
-    <link rel="canonical" href="https://yourdomain.com/">
+    <link rel="canonical" href="{{ settings.site_url }}/">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://yourdomain.com/">
-    <meta property="og:title" content="Stellar Video Downloader | Download from Any Platform">
-    <meta property="og:description"
-        content="The ultimate tool for extracting high-quality video and audio links. Supports ARY Plus, YouTube, and all major social platforms.">
-    <meta property="og:site_name" content="Stellar Studio">
+    <meta property="og:url" content="{{ settings.site_url }}/">
+    <meta property="og:title" content="{{ settings.site_title }} | {{ settings.site_tagline }}">
+    <meta property="og:description" content="{{ settings.site_description }}">
+    <meta property="og:site_name" content="{{ settings.site_title }}">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://yourdomain.com/">
-    <meta property="twitter:title" content="Stellar Video Downloader | Download from Any Platform">
-    <meta property="twitter:description"
-        content="Extract high-quality video and audio links safely and quickly with 32-stream parallel CDN acceleration.">
+    <meta property="twitter:url" content="{{ settings.site_url }}/">
+    <meta property="twitter:title" content="{{ settings.site_title }} | {{ settings.site_tagline }}">
+    <meta property="twitter:description" content="{{ settings.site_description }}">
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='16' fill='%23102421'/><circle cx='16' cy='16' r='10' stroke='%23d6ede4' stroke-width='2' fill='none'/><circle cx='16' cy='16' r='5' fill='%23d6ede4'/></svg>">
 
     <!-- JSON-LD Structured Data -->
-    <script type="application/ld+json">
+    <script type="application/ld+json" nonce="{{ csp_nonce }}">
     [
       {
         "@context": "https://schema.org",
@@ -118,32 +115,128 @@
 
     <!-- Font Awesome & Design System Stylesheet -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20261024_6">
 </head>
 
 <body>
 
     <div class="page-canvas">
 
-        <!-- 1. TOP HEADER (Photo 1) -->
+        <!-- 1. MODERN RESPONSIVE TOP NAVIGATION (Photo 1 Clean + SaaS Header) -->
         <header class="top-header">
-            <a href="/" class="brand-logo">
+            <a href="/" class="brand-logo" title="{{ settings.site_title }} Home">
                 <div class="brand-icon-box">
                     <i class="fa-solid fa-bolt"></i>
                 </div>
                 <div class="brand-title-wrap">
-                    <h1>Stellar Studio</h1>
-                    <span>v2.0</span>
+                    <h1>{{ settings.site_title }}</h1>
+                    <span class="brand-version-badge">PRO v2.0</span>
                 </div>
             </a>
 
+            <!-- Right Actions: Clean, Non-crowded & Responsive -->
             <div class="nav-right-items">
-                <div class="live-badge-pill">
+                <!-- Desktop Nav Link: Blog -->
+                <a href="{{ url_for('blog.index') }}" class="nav-header-link" title="Guides & Tech Articles">
+                    <i class="fa-solid fa-newspaper"></i>
+                    <span>Blog</span>
+                </a>
+
+                <!-- Desktop Nav Link: How to Use -->
+                <a href="#how-to" class="nav-header-link" title="How to Download">
+                    <i class="fa-solid fa-circle-play"></i>
+                    <span>How to Use</span>
+                </a>
+
+                <!-- Live 32x CDN Active Pill -->
+                <div class="live-badge-pill" title="Distributed high-speed edge nodes active">
                     <span class="live-dot"></span>
                     <span>32x CDN Active</span>
                 </div>
+
+                <!-- Admin Dashboard Button (if logged in) -->
+                {% if current_user %}
+                <a href="{{ url_for('admin.dashboard') }}" class="btn-nav-admin" title="Admin Dashboard">
+                    <i class="fa-solid fa-gauge-high"></i>
+                    <span>Admin</span>
+                </a>
+                {% endif %}
+
+                <!-- Mobile Hamburger Toggle Button -->
+                <button type="button" class="mobile-nav-toggle-btn" id="mobileNavToggle" aria-label="Toggle navigation menu" title="Menu">
+                    <i class="fa-solid fa-bars" id="navToggleIcon"></i>
+                </button>
             </div>
         </header>
+
+        <!-- Mobile Navigation Slide-Down Drawer -->
+        <div class="mobile-nav-drawer" id="mobileNavDrawer">
+            <div class="mobile-nav-content">
+                <div class="mobile-nav-header">
+                    <div class="brand-logo" style="min-width: 0; flex: 1; overflow: hidden;">
+                        <div class="brand-icon-box" style="width: 32px; height: 32px; font-size: 14px; flex-shrink: 0;">
+                            <i class="fa-solid fa-bolt"></i>
+                        </div>
+                        <div class="brand-title-wrap" style="min-width: 0; flex: 1;">
+                            <h2 style="font-size: 15px; margin: 0; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ settings.site_title }}</h2>
+                            <span class="brand-version-badge">PRO v2.0</span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close-mobile-nav" id="closeMobileNav" aria-label="Close menu" style="flex-shrink: 0; margin-left: 8px;">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <div class="mobile-nav-list">
+                    <a href="#downloader" class="mobile-nav-item active" onclick="closeMobileMenu()">
+                        <i class="fa-solid fa-bolt"></i>
+                        <span>Downloader Engine</span>
+                    </a>
+                    <a href="#platforms" class="mobile-nav-item" onclick="closeMobileMenu()">
+                        <i class="fa-solid fa-layer-group"></i>
+                        <span>Supported Platforms</span>
+                    </a>
+                    <a href="#how-to" class="mobile-nav-item" onclick="closeMobileMenu()">
+                        <i class="fa-solid fa-circle-play"></i>
+                        <span>How to Download</span>
+                    </a>
+                    <a href="#features" class="mobile-nav-item" onclick="closeMobileMenu()">
+                        <i class="fa-solid fa-star"></i>
+                        <span>Platform Features</span>
+                    </a>
+                    <a href="#faq" class="mobile-nav-item" onclick="closeMobileMenu()">
+                        <i class="fa-solid fa-circle-question"></i>
+                        <span>Frequently Asked Questions</span>
+                    </a>
+                    <a href="{{ url_for('blog.index') }}" class="mobile-nav-item">
+                        <i class="fa-solid fa-newspaper"></i>
+                        <span>Guides &amp; Blog</span>
+                    </a>
+                    <a href="{{ url_for('blog.about_page') }}" class="mobile-nav-item">
+                        <i class="fa-solid fa-circle-info"></i>
+                        <span>About Us</span>
+                    </a>
+                    <a href="{{ url_for('blog.contact_page') }}" class="mobile-nav-item">
+                        <i class="fa-solid fa-envelope"></i>
+                        <span>Contact &amp; Support</span>
+                    </a>
+                </div>
+
+                <div class="mobile-nav-footer">
+                    <a href="#downloader" class="btn-mobile-cta" onclick="closeMobileMenu(); document.getElementById('videoUrl').focus();">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Paste Video Link</span>
+                    </a>
+                    {% if current_user %}
+                    <a href="{{ url_for('admin.dashboard') }}" class="btn-mobile-admin" style="margin-top: 10px;">
+                        <i class="fa-solid fa-gauge-high"></i>
+                        <span>Open Admin Dashboard</span>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="mobile-nav-backdrop" id="mobileNavBackdrop"></div>
 
         <!-- 2. HERO CURVED CARD (Photo 1 Structure + Photo 2 Forest Mint Palette) -->
         <section class="hero-curved-card" id="downloader">
@@ -154,7 +247,7 @@
                     <path d="M2 12C6 4 10 4 14 12C18 4 22 4 26 12C30 4 34 4 38 12" stroke="currentColor"
                         stroke-width="2.5" stroke-linecap="round" />
                 </svg>
-                <span>Stellar Studio</span>
+                <span>{{ settings.site_title }}</span>
             </div>
 
             <!-- Main Big Headline -->
@@ -390,7 +483,7 @@
         </section>
 
         <!-- 6. WHY TO CHOOSE SECTION (4-Column Circular Features from Photo 1) -->
-        <section class="why-choose-section">
+        <section class="why-choose-section" id="features">
             <div class="section-header-centered">
                 <span class="section-label-light">Why To Choose</span>
                 <h2 class="section-title-large">
@@ -442,7 +535,7 @@
         </section>
 
         <!-- 7. UNIVERSAL PLATFORM SPECIFICATIONS & FORMATS -->
-        <section class="platforms-spec-section">
+        <section class="platforms-spec-section" id="platforms">
             <div class="section-header-centered">
                 <span class="section-label-light">Engine Architecture</span>
                 <h2 class="section-title-large">
@@ -650,6 +743,52 @@
             </div>
         </section>
 
+        <!-- 8.5 LIVE CMS ARTICLES SHOWCASE -->
+        {% if recent_articles %}
+        <section class="home-articles-sync" style="padding: 48px 0 24px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 14px;">
+                <div>
+                    <span style="font-family: var(--font-mono); font-size: 0.8rem; font-weight: 700; color: var(--swatch-6); text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 4px;">Direct From Our CMS</span>
+                    <h2 style="font-family: var(--font-display); font-size: 1.85rem; font-weight: 800; color: #ffffff; margin: 0;">Latest Guides &amp; Tech Articles</h2>
+                </div>
+                <a href="{{ url_for('blog.index') }}" style="color: var(--swatch-6); text-decoration: none; font-weight: 700; font-size: 0.88rem; display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 9999px; background: rgba(214, 237, 228, 0.08); border: 1px solid rgba(214, 237, 228, 0.2); transition: all 0.2s;" onmouseover="this.style.background='rgba(214, 237, 228, 0.16)'" onmouseout="this.style.background='rgba(214, 237, 228, 0.08)'">
+                    <span>View All Articles</span>
+                    <i class="fa-solid fa-arrow-right" style="font-size: 12px;"></i>
+                </a>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+                {% for art in recent_articles %}
+                <article style="background: rgba(16, 36, 33, 0.85); border: 1px solid rgba(214, 237, 228, 0.14); border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; transition: transform 0.2s, border-color 0.2s;">
+                    {% if art.featured_image %}
+                    <a href="{{ url_for('blog.post_detail', slug=art.slug) }}" style="display: block; width: 100%; aspect-ratio: 16/9; overflow: hidden; background: #0c1a17;">
+                        <img src="{{ art.featured_image }}" alt="{{ art.title }}" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s;" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'" loading="lazy">
+                    </a>
+                    {% endif %}
+                    <div style="padding: 22px; display: flex; flex-direction: column; flex: 1;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 0.75rem; color: var(--swatch-5);">
+                            <span style="background: rgba(214, 237, 228, 0.1); color: var(--swatch-6); padding: 4px 10px; border-radius: 9999px; font-weight: 700;">{{ art.category_name or 'Guides' }}</span>
+                            <span>{{ art.published_at[:10] if art.published_at else '' }}</span>
+                        </div>
+                        <h3 style="font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; color: #ffffff; margin: 0 0 10px; line-height: 1.4;">
+                            <a href="{{ url_for('blog.post_detail', slug=art.slug) }}" style="color: #ffffff; text-decoration: none;">{{ art.title }}</a>
+                        </h3>
+                        {% if art.excerpt %}
+                        <p style="font-size: 0.85rem; color: rgba(214, 237, 228, 0.75); margin: 0 0 18px; line-height: 1.5; flex: 1;">{{ art.excerpt[:110] }}...</p>
+                        {% endif %}
+                        <div style="margin-top: auto; padding-top: 14px; border-top: 1px solid rgba(214, 237, 228, 0.1); display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem;">
+                            <span style="color: var(--swatch-5); font-weight: 600;">By {{ art.author_name or 'Admin' }}</span>
+                            <a href="{{ url_for('blog.post_detail', slug=art.slug) }}" style="color: var(--swatch-6); font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                                Read Guide <i class="fa-solid fa-chevron-right" style="font-size: 10px;"></i>
+                            </a>
+                        </div>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
         <!-- 9. FOOTER (Photo 1) -->
         <footer class="site-footer">
             <div class="footer-inner">
@@ -657,20 +796,21 @@
                     <div class="brand-icon-box" style="width: 30px; height: 30px; font-size: 14px;">
                         <i class="fa-solid fa-bolt"></i>
                     </div>
-                    <span style="font-family: var(--font-display); font-weight: 800; font-size: 16px;">Stellar
-                        Studio</span>
+                    <span style="font-family: var(--font-display); font-weight: 800; font-size: 16px;">{{ settings.site_title }}</span>
                 </div>
 
                 <div class="footer-nav-links">
                     <a href="#downloader">Downloader</a>
-                    <a href="#how-to">How To Use</a>
-                    <a href="#faq">FAQ</a>
-                    <a href="#privacy">Privacy Policy</a>
-                    <a href="#terms">Terms of Service</a>
+                    <a href="{{ url_for('blog.index') }}">Blog</a>
+                    <a href="{{ url_for('blog.about_page') }}">About</a>
+                    <a href="{{ url_for('blog.contact_page') }}">Contact</a>
+                    <a href="{{ url_for('blog.privacy_page') }}">Privacy Policy</a>
+                    <a href="{{ url_for('blog.terms_page') }}">Terms of Service</a>
+                    <a href="{{ url_for('blog.disclaimer_page') }}">Disclaimer</a>
                 </div>
 
                 <div class="footer-copy">
-                    &copy; 2026 Stellar Studio. All Rights Reserved.
+                    {{ settings.footer_copyright }}
                 </div>
             </div>
         </footer>
@@ -678,7 +818,7 @@
     </div>
 
     <!-- Interactive Logic (Handles Downloads, SSE Stream, Progress, Format Toggles & Accordion) -->
-    <script>
+    <script nonce="{{ csp_nonce }}">
         document.addEventListener('DOMContentLoaded', () => {
             const form = document.getElementById('downloadForm');
             const urlInput = document.getElementById('videoUrl');
@@ -772,13 +912,20 @@
                 statusPillText.textContent = 'Connecting to CDN stream...';
 
                 try {
+                    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                    const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
                     const res = await fetch('/api/download', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken
+                        },
                         body: JSON.stringify({
                             url,
                             format: selectedFormat,
-                            quality: qualitySelect.value || '720'
+                            quality: qualitySelect.value || '720',
+                            csrf_token: csrfToken
                         })
                     });
 
@@ -878,7 +1025,12 @@
             cancelBtn.addEventListener('click', async () => {
                 if (!activeTaskId) return;
                 try {
-                    await fetch(`/api/cancel/${activeTaskId}`, { method: 'POST' });
+                    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                    const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+                    await fetch(`/api/cancel/${activeTaskId}`, { 
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': csrfToken }
+                    });
                 } catch (e) { }
                 if (currentEventSource) currentEventSource.close();
                 dashboardCard.style.display = 'none';
@@ -904,6 +1056,33 @@
                         row.classList.add('active');
                     }
                 });
+            });
+
+            // Mobile Navigation Drawer Toggle Handler
+            const mobileToggle = document.getElementById('mobileNavToggle');
+            const mobileDrawer = document.getElementById('mobileNavDrawer');
+            const mobileBackdrop = document.getElementById('mobileNavBackdrop');
+            const closeBtn = document.getElementById('closeMobileNav');
+
+            function openMobileMenu() {
+                if (mobileDrawer) mobileDrawer.classList.add('open');
+                if (mobileBackdrop) mobileBackdrop.classList.add('open');
+                document.body.style.overflow = 'hidden';
+                document.documentElement.style.overflow = 'hidden';
+            }
+
+            window.closeMobileMenu = function() {
+                if (mobileDrawer) mobileDrawer.classList.remove('open');
+                if (mobileBackdrop) mobileBackdrop.classList.remove('open');
+                document.body.style.overflow = '';
+                document.documentElement.style.overflow = '';
+            };
+
+            if (mobileToggle) mobileToggle.addEventListener('click', openMobileMenu);
+            if (closeBtn) closeBtn.addEventListener('click', closeMobileMenu);
+            if (mobileBackdrop) mobileBackdrop.addEventListener('click', closeMobileMenu);
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeMobileMenu();
             });
         });
     </script>

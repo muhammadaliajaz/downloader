@@ -28,7 +28,7 @@
   --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'Space Grotesk', monospace;
 
-  --max-w: 1040px;
+  --max-w: 1140px;
 }
 
 /* Base Reset */
@@ -42,6 +42,9 @@
 
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden !important;
+  max-width: 100vw;
+  width: 100%;
 }
 
 body {
@@ -50,7 +53,9 @@ body {
   font-family: var(--font-body);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  overflow-x: hidden !important;
+  max-width: 100vw;
+  width: 100%;
 }
 
 /* Page Frame Container matching Photo 1 App Mockup feel */
@@ -59,18 +64,28 @@ body {
   max-width: var(--max-w);
   margin: 0 auto;
   padding: 0 20px;
+  box-sizing: border-box;
 }
 
 /* ==========================================================================
-   1. TOP NAVIGATION / HEADER (Photo 1)
+   1. TOP NAVIGATION / HEADER (Modern Responsive Glassmorphism)
    ========================================================================== */
 .top-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px 0 16px;
-  position: relative;
-  z-index: 20;
+  padding: 14px 20px;
+  margin: 12px 0 20px;
+  background: rgba(16, 36, 33, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(214, 237, 228, 0.16);
+  border-radius: 20px;
+  position: sticky;
+  top: 12px;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  transition: all 0.3s ease;
 }
 
 .brand-logo {
@@ -79,19 +94,25 @@ body {
   gap: 12px;
   text-decoration: none;
   color: var(--text-primary);
+  flex-shrink: 0;
 }
 
 .brand-icon-box {
   width: 38px;
   height: 38px;
   border-radius: 12px;
-  background: var(--swatch-6);
+  background: linear-gradient(135deg, var(--swatch-6) 0%, #a7f3d0 100%);
   color: var(--swatch-1);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 18px;
-  box-shadow: 0 4px 14px rgba(214, 237, 228, 0.25);
+  box-shadow: 0 4px 14px rgba(214, 237, 228, 0.35);
+  transition: transform 0.2s ease;
+}
+
+.brand-logo:hover .brand-icon-box {
+  transform: rotate(-8deg) scale(1.05);
 }
 
 .brand-title-wrap h1 {
@@ -100,21 +121,403 @@ body {
   font-size: 20px;
   letter-spacing: -0.02em;
   line-height: 1.1;
-  color: var(--text-primary);
+  color: #ffffff;
+  margin: 0;
 }
 
-.brand-title-wrap span {
-  font-size: 11px;
-  color: var(--swatch-5);
-  font-weight: 600;
+.brand-version-badge {
+  display: inline-block;
+  font-size: 10px;
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.14);
+  border: 1px solid rgba(74, 222, 128, 0.25);
+  padding: 1px 6px;
+  border-radius: 9999px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
+  margin-top: 2px;
 }
 
+/* Desktop Right Navigation Links (Blog, How to Use) */
+.nav-header-link {
+  color: rgba(214, 237, 228, 0.85);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  background: rgba(214, 237, 228, 0.08);
+  border: 1px solid rgba(214, 237, 228, 0.16);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.nav-header-link i {
+  color: var(--swatch-5);
+  font-size: 12px;
+}
+
+.nav-header-link:hover {
+  color: #ffffff;
+  background: rgba(214, 237, 228, 0.16);
+  border-color: rgba(214, 237, 228, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Nav Right Actions */
 .nav-right-items {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-nav-admin {
+  color: #00e699;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.84rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  background: rgba(0, 230, 153, 0.12);
+  border: 1px solid rgba(0, 230, 153, 0.35);
+  transition: all 0.2s ease;
+}
+
+.btn-nav-admin:hover {
+  background: rgba(0, 230, 153, 0.22);
+  transform: translateY(-1px);
+}
+
+/* Mobile Hamburger Toggle Button */
+.mobile-nav-toggle-btn {
+  display: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(214, 237, 228, 0.08);
+  border: 1px solid rgba(214, 237, 228, 0.2);
+  color: #ffffff;
+  font-size: 18px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.mobile-nav-toggle-btn:hover {
+  background: rgba(214, 237, 228, 0.16);
+  border-color: rgba(214, 237, 228, 0.35);
+}
+
+/* Mobile Nav Drawer & Backdrop */
+.mobile-nav-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(300px, 82vw);
+  max-width: 100vw;
+  background: #0d1e1b;
+  border-left: 1px solid rgba(214, 237, 228, 0.15);
+  z-index: 1000;
+  transform: translateX(105%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: -10px 0 40px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.mobile-nav-drawer.open {
+  transform: translateX(0);
+}
+
+.mobile-nav-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.mobile-nav-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.mobile-nav-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 24px 20px;
+  overflow-y: auto;
+}
+
+.mobile-nav-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(214, 237, 228, 0.1);
+  margin-bottom: 20px;
+}
+
+.btn-close-mobile-nav {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(214, 237, 228, 0.08);
+  border: 1px solid rgba(214, 237, 228, 0.18);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.mobile-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.mobile-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  color: rgba(214, 237, 228, 0.85);
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.mobile-nav-item i {
+  font-size: 16px;
+  width: 22px;
+  color: var(--swatch-5);
+}
+
+.mobile-nav-item:hover,
+.mobile-nav-item.active {
+  background: rgba(214, 237, 228, 0.12);
+  color: #ffffff;
+}
+
+.mobile-nav-item.active i {
+  color: #4ade80;
+}
+
+.mobile-nav-footer {
+  padding-top: 20px;
+  border-top: 1px solid rgba(214, 237, 228, 0.1);
+}
+
+.btn-mobile-cta {
+  width: 100%;
+  padding: 13px;
+  background: var(--swatch-6);
+  color: var(--swatch-1);
+  font-weight: 800;
+  font-size: 14px;
+  border-radius: 9999px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(214, 237, 228, 0.3);
+}
+
+.btn-mobile-admin {
+  width: 100%;
+  padding: 11px;
+  background: rgba(0, 230, 153, 0.12);
+  border: 1px solid rgba(0, 230, 153, 0.3);
+  color: #00e699;
+  font-weight: 700;
+  font-size: 13px;
+  border-radius: 9999px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Responsive Breakpoints for Downloader Navbar & Hero */
+@media (max-width: 860px) {
+  .nav-header-link {
+    display: none !important;
+  }
+
+  .mobile-nav-toggle-btn {
+    display: inline-flex !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-canvas {
+    padding: 0 12px;
+  }
+
+  .top-header {
+    padding: 10px 14px;
+    margin: 8px 0 16px;
+    border-radius: 18px;
+  }
+
+  .brand-title-wrap h1 {
+    font-size: 16px;
+    max-width: 175px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .brand-icon-box {
+    width: 34px;
+    height: 34px;
+    font-size: 15px;
+    border-radius: 10px;
+  }
+
+  .brand-version-badge {
+    display: none;
+  }
+
+  .live-badge-pill span:last-child {
+    display: none;
+  }
+
+  .live-badge-pill {
+    padding: 6px;
+    border-radius: 50%;
+  }
+
+  .btn-nav-admin span {
+    display: none;
+  }
+
+  .btn-nav-admin {
+    padding: 7px 10px;
+    border-radius: 10px;
+    font-size: 13px;
+  }
+
+  .mobile-nav-toggle-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  /* Hero Card and Controls on Mobile */
+  .hero-curved-card {
+    border-radius: 28px;
+    padding: 36px 16px 28px;
+    margin-bottom: 24px;
+  }
+
+  .hero-headline {
+    font-size: clamp(28px, 7.5vw, 36px);
+    margin-bottom: 12px;
+  }
+
+  .hero-subtext {
+    font-size: 13.5px;
+    margin-bottom: 22px;
+    padding: 0 4px;
+  }
+
+  /* Restored Sleek Single-Line Horizontal Search Pill (Photo 1) */
+  .search-pill-bar {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    border-radius: 9999px !important;
+    padding: 5px 6px 5px 16px !important;
+    gap: 8px !important;
+    background: #ffffff !important;
+  }
+
+  .search-icon-left {
+    display: inline-flex !important;
+    font-size: 15px;
+    color: #55726a;
+  }
+
+  .search-pill-input {
+    width: auto !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+    font-size: 13.5px !important;
+    padding: 6px 0 !important;
+    text-align: left !important;
+  }
+
+  .btn-pill-download {
+    width: auto !important;
+    padding: 10px 18px !important;
+    font-size: 13px !important;
+    border-radius: 9999px !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+  }
+
+  .supported-platforms-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 16px;
+    border-radius: 9999px;
+    max-width: 100%;
+    box-sizing: border-box;
+    font-size: 11px;
+  }
+
+  .supported-icons-list {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12.5px;
+  }
+}
+
+@media (max-width: 390px) {
+  .search-pill-bar {
+    padding: 4px 5px 4px 12px !important;
+    gap: 6px !important;
+  }
+
+  .search-icon-left {
+    font-size: 13px;
+  }
+
+  .search-pill-input {
+    font-size: 12.5px;
+  }
+
+  .btn-pill-download {
+    padding: 9px 14px !important;
+    font-size: 12px !important;
+  }
 }
 
 .live-badge-pill {

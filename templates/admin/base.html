@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+    <title>{% block title %}Admin Dashboard{% endblock %} | Stellar Studio</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}?v=20261024_5">
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="admin-body">
+
+    <!-- Mobile Backdrop -->
+    <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
+
+    <!-- Admin Sidebar -->
+    <aside class="admin-sidebar" id="adminSidebar">
+        <a href="{{ url_for('admin.dashboard') }}" class="sidebar-brand">
+            <div class="brand-icon">
+                <i class="fa-solid fa-pen-nib"></i>
+            </div>
+            <div class="brand-title">
+                Stellar Admin
+                <span>Content Suite</span>
+            </div>
+        </a>
+
+        <ul class="sidebar-menu">
+            <li class="menu-label">Content Management</li>
+            <li>
+                <a href="{{ url_for('admin.dashboard') }}" class="sidebar-link {% if active_page == 'dashboard' %}active{% endif %}">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Dashboard</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('admin.posts_list') }}" class="sidebar-link {% if active_page == 'posts' %}active{% endif %}">
+                    <i class="fa-solid fa-newspaper"></i>
+                    <span>Articles</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('admin.post_new') }}" class="sidebar-link {% if active_page == 'post_new' %}active{% endif %}">
+                    <i class="fa-solid fa-pen-nib"></i>
+                    <span>Write Article</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('admin.categories') }}" class="sidebar-link {% if active_page == 'categories' %}active{% endif %}">
+                    <i class="fa-solid fa-folder-tree"></i>
+                    <span>Categories</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('admin.tags') }}" class="sidebar-link {% if active_page == 'tags' %}active{% endif %}">
+                    <i class="fa-solid fa-tags"></i>
+                    <span>Tags</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('admin.media_library') }}" class="sidebar-link {% if active_page == 'media' %}active{% endif %}">
+                    <i class="fa-solid fa-photo-film"></i>
+                    <span>Media Library</span>
+                </a>
+            </li>
+
+            <li class="menu-label">System & Setup</li>
+            <li>
+                <a href="{{ url_for('admin.account', tab='profile') }}" class="sidebar-link {% if active_page == 'account' and (not active_tab or active_tab != '2fa') %}active{% endif %}">
+                    <i class="fa-solid fa-user-gear"></i>
+                    <span>Account Profile</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('admin.account', tab='2fa') }}" class="sidebar-link {% if active_page == 'account' and active_tab == '2fa' %}active{% endif %}">
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    <span>Two-Factor (2FA)</span>
+                    {% if current_user and current_user.mfa_enabled %}
+                        <span class="badge-pill green" style="margin-left: auto; font-size: 0.65rem; padding: 2px 7px;">Active</span>
+                    {% else %}
+                        <span class="badge-pill amber" style="margin-left: auto; font-size: 0.65rem; padding: 2px 7px;">Off</span>
+                    {% endif %}
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('admin.settings') }}" class="sidebar-link {% if active_page == 'settings' %}active{% endif %}">
+                    <i class="fa-solid fa-sliders"></i>
+                    <span>Settings</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('blog.index') }}" target="_blank" class="sidebar-link">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    <span>View Live Blog</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ url_for('index') }}" target="_blank" class="sidebar-link">
+                    <i class="fa-solid fa-download"></i>
+                    <span>View Downloader</span>
+                </a>
+            </li>
+        </ul>
+
+        <div class="sidebar-footer">
+            <a href="{{ url_for('admin.account') }}" class="user-snippet" style="text-decoration: none;" title="Manage Profile & Security">
+                <div class="avatar-initial">{{ current_user.display_name[:1].upper() if current_user and current_user.display_name else 'A' }}</div>
+                <div style="min-width: 0;">
+                    <div style="font-weight: 700; color: var(--admin-text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.9rem;">{{ current_user.display_name if current_user and current_user.display_name else 'Admin' }}</div>
+                    <div style="font-size: 0.72rem; color: var(--admin-text-muted);">{{ current_user.role if current_user else 'Super Admin' }}</div>
+                </div>
+            </a>
+            <a href="{{ url_for('admin.logout') }}" class="btn-icon danger" title="Sign Out">
+                <i class="fa-solid fa-right-from-bracket"></i>
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <div class="admin-main">
+        <header class="admin-topbar">
+            <div class="topbar-left">
+                <button type="button" class="btn-sidebar-toggle" id="sidebarToggle" title="Toggle Sidebar" aria-label="Toggle Navigation Menu">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div class="topbar-heading-group">
+                    <div class="brand-icon topbar-brand-icon" style="width: 32px; height: 32px; font-size: 13px; border-radius: 9px;">
+                        <i class="fa-solid fa-pen-nib"></i>
+                    </div>
+                    <h1 class="topbar-title">
+                        {% block page_title %}Dashboard{% endblock %}
+                    </h1>
+                </div>
+            </div>
+
+            <div class="topbar-right">
+                <a href="{{ url_for('blog.index') }}" target="_blank" class="btn-white-pill topbar-btn-preview" title="View Public Blog">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    <span class="btn-text">Preview Blog</span>
+                </a>
+                <a href="{{ url_for('admin.post_new') }}" class="btn-dark-pill topbar-btn-new" title="Create New Article">
+                    <i class="fa-solid fa-plus"></i>
+                    <span class="btn-text">New Article</span>
+                </a>
+            </div>
+        </header>
+
+        <main class="admin-content-area">
+            <!-- Flash Message System -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div style="margin-bottom: 24px;">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'success' if category == 'success' else ('error' if category == 'error' else 'info') }}" style="margin-bottom: 10px; display:flex; align-items:center; justify-content:space-between;">
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    {% if category == 'success' %}
+                                        <i class="fa-solid fa-circle-check"></i>
+                                    {% elif category == 'error' %}
+                                        <i class="fa-solid fa-circle-exclamation"></i>
+                                    {% else %}
+                                        <i class="fa-solid fa-circle-info"></i>
+                                    {% endif %}
+                                    <span>{{ message }}</span>
+                                </div>
+                                <button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; color:inherit; cursor:pointer; font-size:16px;">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <!-- Mobile Sidebar Responsive Script -->
+    <script>
+        (function() {
+            const toggle = document.getElementById('sidebarToggle');
+            const sidebar = document.getElementById('adminSidebar');
+            const backdrop = document.getElementById('sidebarBackdrop');
+
+            function openSidebar() {
+                sidebar.classList.add('open');
+                backdrop.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            }
+
+            function closeSidebar() {
+                sidebar.classList.remove('open');
+                backdrop.classList.remove('open');
+                document.body.style.overflow = '';
+            }
+
+            if (toggle) toggle.addEventListener('click', openSidebar);
+            if (backdrop) backdrop.addEventListener('click', closeSidebar);
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closeSidebar();
+            });
+
+            // 30-Minute Inactivity Auto-Logout Security Guard
+            let idleTimer;
+            const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
+            function resetIdleTimer() {
+                clearTimeout(idleTimer);
+                idleTimer = setTimeout(() => {
+                    alert('Session expired due to 30 minutes of inactivity. Logging out for security.');
+                    window.location.href = "{{ url_for('admin.logout') }}";
+                }, IDLE_TIMEOUT_MS);
+            }
+
+            ['mousemove', 'keydown', 'scroll', 'touchstart', 'click'].forEach(evt => {
+                document.addEventListener(evt, resetIdleTimer, { passive: true });
+            });
+            resetIdleTimer();
+        })();
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

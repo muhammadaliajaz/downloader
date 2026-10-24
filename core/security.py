@@ -4,6 +4,7 @@ import os
 import time
 import threading
 import socket
+from contextlib import contextmanager
 from collections import defaultdict
 
 # In-memory storage for IP rate limiting
@@ -134,7 +135,7 @@ def validate_url(url):
         return False, f"Target port {port} is prohibited. Only standard web ports (80, 443, 8080, 8443) are allowed."
 
     # Block local loopback and internal hostname patterns
-    blocked_hosts = ['localhost', 'loopback', 'local', 'internal', 'intranet']
+    blocked_hosts = ['localhost', 'loopback', 'local', 'internal', 'intranet', 'instance-data', 'metadata', 'localdomain', 'onion']
     if any(h == hostname or hostname.endswith('.' + h) for h in blocked_hosts):
         return False, "Access to local or internal network destinations is prohibited"
 
@@ -158,8 +159,9 @@ def validate_url(url):
         except socket.gaierror:
             # If domain cannot be resolved via DNS, reject it to prevent blind SSRF
             return False, "Target domain name does not exist or could not be resolved"
-        except Exception:
-            pass
+        except Exception as e:
+            # Strictly fail-closed on any unexpected DNS, network, or resolver error
+            return False, f"Domain security resolution failed: {str(e)}"
 
     return True, None
 
@@ -176,3 +178,39 @@ def is_safe_filepath(file_path, base_directory):
     
     # Common prefix check with separator to prevent path prefix matching attacks
     return os.path.commonpath([target_abs, base_abs]) == base_abs
+
+@contextmanager
+def ssrf_safe_socket():
+    """
+    Context manager that intercepts socket.create_connection during external fetches.
+    Guarantees that DNS rebinding and HTTP 30x redirects to private/loopback/cloud
+    metadata addresses are blocked at the socket connection level.
+    """
+    orig_create_connection = socket.create_connection
+
+    def guarded_create_connection(address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None, **kwargs):
+        host, port = address[0], address[1]
+        try:
+            ip = ipaddress.ip_address(host)
+            if is_prohibited_ip(ip):
+                raise socket.error(f"SSRF Guard: Prohibited IP destination {ip}")
+        except ValueError:
+            try:
+                addrs = socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+                for addr in addrs:
+                    ip = ipaddress.ip_address(addr[4][0])
+                    if is_prohibited_ip(ip):
+                        raise socket.error(f"SSRF Guard: Prohibited resolved IP destination {ip} for {host}")
+            except socket.gaierror:
+                raise socket.error(f"SSRF Guard: Domain {host} could not be resolved")
+
+        if source_address:
+            return orig_create_connection(address, timeout, source_address=source_address, **kwargs)
+        return orig_create_connection(address, timeout, **kwargs)
+
+    socket.create_connection = guarded_create_connection
+    try:
+        yield
+    finally:
+        socket.create_connection = orig_create_connection
+
