@@ -59,6 +59,9 @@
         overflow: hidden;
         box-shadow: var(--shadow-floating);
     }
+    .d-none {
+        display: none !important;
+    }
 </style>
 {% endblock %}
 
@@ -106,7 +109,7 @@
 
     <!-- Editor Body Container -->
     <div style="padding: 28px 32px 32px;">
-        <form id="postForm" method="POST" enctype="multipart/form-data" action="{{ url_for('admin.post_edit', post_id=post.id) if is_edit else url_for('admin.post_create') }}">
+        <form id="postForm" data-is-edit="{{ '1' if is_edit else '0' }}" method="POST" enctype="multipart/form-data" action="{{ url_for('admin.post_edit', post_id=post.id) if is_edit else url_for('admin.post_create') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="content" id="hiddenContent">
 
@@ -261,7 +264,7 @@
                         </div>
 
                         <!-- Schedule Date Picker -->
-                        <div class="form-group" id="scheduleDateGroup" style="display: {% if post.status == 'scheduled' %}block{% else %}none{% endif %}; margin-bottom: 16px;">
+                        <div class="form-group {% if post.status != 'scheduled' %}d-none{% endif %}" id="scheduleDateGroup" style="margin-bottom: 16px;">
                             <label class="form-label" for="scheduled_for">Schedule Date & Time</label>
                             <input type="datetime-local" id="scheduled_for" name="scheduled_for" value="{{ post.scheduled_for.replace(' ', 'T')[:16] if post.scheduled_for else '' }}" class="form-input">
                             <div style="font-size: 0.75rem; color: #b45309; margin-top: 4px;">
@@ -297,16 +300,20 @@
                             <span>Featured Image</span>
                         </div>
 
-                        <div class="featured-img-preview" id="featuredImgPreview">
-                            {% if post.featured_image %}
-                                <img src="{{ post.featured_image }}" alt="Featured Preview" id="featuredImgTag">
-                            {% else %}
-                                <div id="noImgPlaceholder" style="text-align: center; color: var(--admin-text-muted); font-size: 0.85rem;">
-                                    <i class="fa-solid fa-mountain-sun" style="font-size: 32px; margin-bottom: 6px; display: block; opacity: 0.3;"></i>
-                                    <span>No image selected</span>
-                                </div>
-                                <img src="" alt="" id="featuredImgTag" style="display: none;">
-                            {% endif %}
+                        <div class="featured-img-preview" id="featuredImgPreview" style="position: relative; min-height: 150px; display: flex; align-items: center; justify-content: center; background: #f8fafc; border: 1.5px dashed var(--admin-border); border-radius: var(--radius-md); overflow: hidden; margin-bottom: 12px;">
+                            <div id="noImgPlaceholder" class="{% if post.featured_image %}d-none{% endif %}" style="text-align: center; color: var(--admin-text-muted); font-size: 0.85rem; padding: 18px;">
+                                <i class="fa-solid fa-mountain-sun" style="font-size: 32px; margin-bottom: 6px; display: block; opacity: 0.35;"></i>
+                                <span style="font-weight: 600;">No image selected</span>
+                                <div style="font-size: 0.75rem; margin-top: 4px; opacity: 0.7;">Upload from computer or pick from Library</div>
+                            </div>
+                            
+                            <img src="{{ post.featured_image or '' }}" alt="Featured Preview" id="featuredImgTag" class="{% if not post.featured_image %}d-none{% endif %}" style="width: 100%; height: auto; max-height: 220px; object-fit: cover;">
+
+                            <!-- Loading Spinner Overlay -->
+                            <div id="featuredImgLoading" class="d-none" style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.65); color: #ffffff; align-items: center; justify-content: center; flex-direction: column; gap: 8px; font-size: 0.85rem; font-weight: 700; z-index: 5;">
+                                <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 24px; color: #38bdf8;"></i>
+                                <span>Uploading image...</span>
+                            </div>
                         </div>
 
                         <input type="hidden" name="featured_image" id="featuredImageInput" value="{{ post.featured_image or '' }}">
@@ -324,7 +331,7 @@
                             </button>
                         </div>
 
-                        <button type="button" class="btn-secondary danger" id="removeImgBtn" style="width: 100%; justify-content: center; font-size: 0.8rem; {% if not post.featured_image %}display:none;{% endif %}" onclick="removeFeaturedImage()">
+                        <button type="button" class="btn-secondary danger {% if not post.featured_image %}d-none{% endif %}" id="removeImgBtn" style="width: 100%; justify-content: center; font-size: 0.8rem;" onclick="removeFeaturedImage()">
                             <i class="fa-solid fa-trash-can"></i>
                             <span>Remove Featured Image</span>
                         </button>
@@ -458,17 +465,24 @@
             const file = input.files[0];
             if (!file) return;
 
+            const csrfInput = document.querySelector('input[name="csrf_token"]');
+            const csrfVal = csrfInput ? csrfInput.value : '';
+
             const formData = new FormData();
             formData.append('image', file);
-            formData.append('csrf_token', '{{ csrf_token() }}');
+            formData.append('file', file);
+            if (csrfVal) formData.append('csrf_token', csrfVal);
 
             try {
                 const res = await fetch("{{ url_for('admin.api_upload_media') }}", {
                     method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfVal
+                    },
                     body: formData
                 });
                 const data = await res.json();
-                if (data.url) {
+                if (res.ok && data.url) {
                     const range = quill.getSelection(true);
                     quill.insertEmbed(range.index, 'image', data.url);
                 } else {
@@ -482,45 +496,106 @@
 
     // Direct upload for Featured Image
     async function uploadDirectFeatured(fileInput) {
-        const file = fileInput.files[0];
+        const file = fileInput && fileInput.files && fileInput.files[0];
         if (!file) return;
+
+        // Size check (5MB limit)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('File exceeds 5MB size limit. Please choose a smaller image.');
+            fileInput.value = '';
+            return;
+        }
+
+        const loader = document.getElementById('featuredImgLoading');
+        if (loader) {
+            loader.classList.remove('d-none');
+            loader.style.display = 'flex';
+        }
+
+        const csrfInput = document.querySelector('input[name="csrf_token"]');
+        const csrfVal = csrfInput ? csrfInput.value : '';
 
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('csrf_token', '{{ csrf_token() }}');
+        formData.append('image', file);
+        if (csrfVal) formData.append('csrf_token', csrfVal);
 
         try {
             const res = await fetch("{{ url_for('admin.api_upload_media') }}", {
                 method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfVal
+                },
                 body: formData
             });
             const data = await res.json();
-            if (data.url) {
+            if (res.ok && data.url) {
                 setFeaturedImage(data.url);
             } else {
-                alert(data.error || 'Image upload failed.');
+                alert(data.error || 'Image upload failed. Please try again.');
             }
         } catch (err) {
-            alert('Upload request failed.');
+            alert('Upload request failed. Please check network connection.');
+        } finally {
+            if (loader) {
+                loader.classList.add('d-none');
+                loader.style.display = 'none';
+            }
+            fileInput.value = '';
         }
     }
 
     function setFeaturedImage(url) {
-        document.getElementById('featuredImageInput').value = url;
+        const input = document.getElementById('featuredImageInput');
+        if (input) input.value = url;
+
         const img = document.getElementById('featuredImgTag');
-        img.src = url;
-        img.style.display = 'block';
-        document.getElementById('noImgPlaceholder').style.display = 'none';
-        document.getElementById('removeImgBtn').style.display = 'inline-flex';
+        if (img) {
+            img.src = url;
+            img.classList.remove('d-none');
+            img.style.display = 'block';
+        }
+
+        const placeholder = document.getElementById('noImgPlaceholder');
+        if (placeholder) {
+            placeholder.classList.add('d-none');
+            placeholder.style.display = 'none';
+        }
+
+        const removeBtn = document.getElementById('removeImgBtn');
+        if (removeBtn) {
+            removeBtn.classList.remove('d-none');
+            removeBtn.style.display = 'inline-flex';
+        }
     }
 
     function removeFeaturedImage() {
-        document.getElementById('featuredImageInput').value = '';
+        const input = document.getElementById('featuredImageInput');
+        if (input) input.value = '';
+
         const img = document.getElementById('featuredImgTag');
-        img.src = '';
-        img.style.display = 'none';
-        document.getElementById('noImgPlaceholder').style.display = 'block';
-        document.getElementById('removeImgBtn').style.display = 'none';
+        if (img) {
+            img.src = '';
+            img.classList.add('d-none');
+            img.style.display = 'none';
+        }
+
+        const placeholder = document.getElementById('noImgPlaceholder');
+        if (placeholder) {
+            placeholder.classList.remove('d-none');
+            placeholder.style.display = 'block';
+        }
+
+        const removeBtn = document.getElementById('removeImgBtn');
+        if (removeBtn) {
+            removeBtn.classList.add('d-none');
+            removeBtn.style.display = 'none';
+        }
+
+        const fileInput = document.getElementById('directFeaturedUpload');
+        if (fileInput) {
+            fileInput.value = '';
+        }
     }
 
     // Media Modal
@@ -536,7 +611,8 @@
     }
 
     // Auto-slug generator
-    let autoSlug = {{ 'false' if is_edit else 'true' }};
+    const postFormEl = document.getElementById('postForm');
+    let autoSlug = postFormEl ? postFormEl.dataset.isEdit !== '1' : true;
     const titleInput = document.getElementById('postTitle');
     const slugInput = document.getElementById('postSlug');
     const slugLockBtn = document.getElementById('slugLockBtn');
@@ -581,14 +657,17 @@
         const sheetSubmitText = document.getElementById('sheetSubmitText');
 
         if (status === 'scheduled') {
+            schedGroup.classList.remove('d-none');
             schedGroup.style.display = 'block';
             submitText.innerText = 'Schedule Publication';
             if (sheetSubmitText) sheetSubmitText.innerText = 'Schedule Publication';
         } else if (status === 'published') {
+            schedGroup.classList.add('d-none');
             schedGroup.style.display = 'none';
             submitText.innerText = 'Publish Now';
             if (sheetSubmitText) sheetSubmitText.innerText = 'Publish Now';
         } else {
+            schedGroup.classList.add('d-none');
             schedGroup.style.display = 'none';
             submitText.innerText = 'Save as Draft';
             if (sheetSubmitText) sheetSubmitText.innerText = 'Save as Draft';

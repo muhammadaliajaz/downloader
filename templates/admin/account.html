@@ -184,6 +184,9 @@
 
                 <!-- 1. Emergency Backup Codes Alert (Displayed right after enabling 2FA) -->
                 {% if generated_backup_codes %}
+                    <script type="application/json" id="generatedBackupCodesData" data-username="{{ current_user.username if current_user else '' }}">
+                    {{ (generated_backup_codes or [])|tojson }}
+                    </script>
                     <div style="padding: 24px; background: #ecfdf5; border: 2px solid #059669; border-radius: 16px; margin-bottom: 26px; box-shadow: 0 4px 16px rgba(5, 150, 105, 0.08);">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 12px;">
                             <div style="display: flex; align-items: center; gap: 12px;">
@@ -553,50 +556,68 @@
         }
     });
 
+    function getGeneratedBackupCodes() {
+        const el = document.getElementById('generatedBackupCodesData');
+        if (!el) return [];
+        try {
+            return JSON.parse(el.textContent.trim());
+        } catch (e) {
+            return [];
+        }
+    }
+
     function downloadBackupCodes() {
-        {% if generated_backup_codes %}
-        const codesList = [{% for c in generated_backup_codes %}"{{ c }}"{% if not loop.last %}, {% endif %}{% endfor %}];
+        const codesList = getGeneratedBackupCodes();
+        if (!codesList || codesList.length === 0) {
+            alert('No backup codes available to download.');
+            return;
+        }
+
+        const el = document.getElementById('generatedBackupCodesData');
+        const username = (el && el.getAttribute('data-username')) || 'admin';
+        const dateStr = new Date().toLocaleString();
+
+        const formattedCodes = codesList.map(function(code, idx) {
+            return '  ' + (idx + 1) + '.  ' + code;
+        }).join('\n');
+
         const content = 
-`==================================================
-STELLAR STUDIO — 2FA EMERGENCY BACKUP CODES
-==================================================
-Account: {{ current_user.username }}
-Generated on: ${new Date().toLocaleString()}
-
-These single-use backup scratch codes allow you to log in 
-if you lose access to your Google Authenticator phone.
-Each code can only be used ONCE.
-
---------------------------------------------------
-` + codesList.map((code, idx) => `  ${idx + 1}.  ${code}`).join('\n') + `
---------------------------------------------------
-
-Store this file safely in an encrypted vault or password manager.
-==================================================`;
+'==================================================\n' +
+'STELLAR STUDIO — 2FA EMERGENCY BACKUP CODES\n' +
+'==================================================\n' +
+'Account: ' + username + '\n' +
+'Generated on: ' + dateStr + '\n\n' +
+'These single-use backup scratch codes allow you to log in\n' +
+'if you lose access to your Google Authenticator phone.\n' +
+'Each code can only be used ONCE.\n\n' +
+'--------------------------------------------------\n' +
+formattedCodes + '\n' +
+'--------------------------------------------------\n\n' +
+'Store this file safely in an encrypted vault or password manager.\n' +
+'==================================================';
 
         const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `stellar_2fa_backup_codes_{{ current_user.username }}.txt`;
+        a.download = 'stellar_2fa_backup_codes_' + username + '.txt';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        {% else %}
-        alert('No backup codes available to download.');
-        {% endif %}
     }
 
     function copyAllBackupCodes() {
-        {% if generated_backup_codes %}
-        const codesList = [{% for c in generated_backup_codes %}"{{ c }}"{% if not loop.last %}, {% endif %}{% endfor %}];
-        navigator.clipboard.writeText(codesList.join('\n')).then(() => {
-            alert('All 8 emergency backup codes copied to clipboard!');
-        }).catch(() => {
+        const codesList = getGeneratedBackupCodes();
+        if (!codesList || codesList.length === 0) {
+            alert('No backup codes available to copy.');
+            return;
+        }
+        navigator.clipboard.writeText(codesList.join('\n')).then(function() {
+            alert('All ' + codesList.length + ' emergency backup codes copied to clipboard!');
+        }).catch(function() {
             alert('Failed to copy. Please select and copy manually.');
         });
-        {% endif %}
     }
 </script>
 {% endblock %}

@@ -465,8 +465,8 @@ def post_create():
         excerpt = request.form.get('excerpt', '').strip()
         raw_content = request.form.get('content', '')
         category_id = request.form.get('category_id', type=int)
-        featured_image = request.form.get('featured_image', '').strip()
-        featured_image_alt = request.form.get('featured_image_alt', '').strip()
+        featured_image = request.form.get('featured_image', '').strip() or None
+        featured_image_alt = request.form.get('featured_image_alt', '').strip() or None
         author_name = request.form.get('author_name', session.get('username', 'Admin')).strip()
         status = request.form.get('status', 'draft') # 'draft', 'published', 'scheduled'
         scheduled_for = request.form.get('scheduled_for', '').strip()
@@ -593,8 +593,8 @@ def post_edit(post_id):
         excerpt = request.form.get('excerpt', '').strip()
         raw_content = request.form.get('content', '')
         category_id = request.form.get('category_id', type=int)
-        featured_image = request.form.get('featured_image', '').strip()
-        featured_image_alt = request.form.get('featured_image_alt', '').strip()
+        featured_image = request.form.get('featured_image', '').strip() or None
+        featured_image_alt = request.form.get('featured_image_alt', '').strip() or None
         author_name = request.form.get('author_name', '').strip() or post['author_name']
         new_status = request.form.get('status', 'draft')
         scheduled_for = request.form.get('scheduled_for', '').strip()

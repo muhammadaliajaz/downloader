@@ -708,5 +708,80 @@ class TestSecureAdminAndCMS(unittest.TestCase):
         self.assertIn('Disallow: /api/', robots_res.data.decode('utf-8'))
         self.assertIn('Disallow: /downloads/', robots_res.data.decode('utf-8'))
 
+    def test_featured_image_upload_and_removal(self):
+        """Validates that featured images can be uploaded via AJAX endpoint, assigned to articles, and removed."""
+        import io
+        from core.auth import hash_password
+
+        conn = get_db_connection()
+        user = conn.execute("SELECT * FROM users WHERE username = 'superadmin'").fetchone()
+        if not user:
+            conn.execute("INSERT INTO users (username, display_name, password_hash, email, role) VALUES (?, ?, ?, ?, ?)",
+                         ('superadmin', 'Senior Editor', hash_password('ComplexPassword123!'), 'admin@stellar.tech', 'admin'))
+            conn.commit()
+            user = conn.execute("SELECT * FROM users WHERE username = 'superadmin'").fetchone()
+        conn.close()
+
+        # 1. Login as admin
+        with self.client:
+            with self.client.session_transaction() as sess:
+                sess['user_id'] = user['id']
+                sess['username'] = user['username']
+                sess['role'] = user['role']
+                sess['display_name'] = user['display_name']
+                sess['_csrf_token'] = 'test_token_123'
+
+            # 2. Upload valid PNG image via /admin/api/upload
+            png_bytes = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
+            data = {
+                'file': (io.BytesIO(png_bytes), 'featured_test.png'),
+                'csrf_token': 'test_token_123'
+            }
+            res = self.client.post('/admin/api/upload', data=data, content_type='multipart/form-data')
+            self.assertEqual(res.status_code, 200)
+            res_json = res.get_json()
+            self.assertTrue(res_json.get('success'))
+            uploaded_url = res_json.get('url')
+            self.assertTrue(uploaded_url.startswith('/static/uploads/'))
+
+            # 3. Create post with featured image
+            create_data = {
+                'csrf_token': 'test_token_123',
+                'title': 'Article With Featured Image',
+                'content': '<p>Article body content</p>',
+                'status': 'published',
+                'featured_image': uploaded_url,
+                'featured_image_alt': 'Test alt description'
+            }
+            create_res = self.client.post('/admin/posts/new', data=create_data, follow_redirects=True)
+            self.assertEqual(create_res.status_code, 200)
+
+            # Check post in DB
+            conn = get_db_connection()
+            post_row = conn.execute("SELECT * FROM articles WHERE title = ?", ('Article With Featured Image',)).fetchone()
+            self.assertIsNotNone(post_row)
+            post_id = post_row['id']
+            self.assertEqual(post_row['featured_image'], uploaded_url)
+            self.assertEqual(post_row['featured_image_alt'], 'Test alt description')
+            conn.close()
+
+            # 4. Remove featured image by updating post with empty featured_image
+            edit_data = {
+                'csrf_token': 'test_token_123',
+                'title': 'Article With Featured Image',
+                'content': '<p>Article body content</p>',
+                'status': 'published',
+                'featured_image': '',  # Removed!
+                'featured_image_alt': ''
+            }
+            edit_res = self.client.post(f'/admin/posts/{post_id}/edit', data=edit_data, follow_redirects=True)
+            self.assertEqual(edit_res.status_code, 200)
+
+            # Check post in DB has featured_image cleared (None / NULL)
+            conn = get_db_connection()
+            updated_post = conn.execute("SELECT * FROM articles WHERE id = ?", (post_id,)).fetchone()
+            self.assertIsNone(updated_post['featured_image'])
+            conn.close()
+
 if __name__ == '__main__':
     unittest.main()
