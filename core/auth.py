@@ -89,8 +89,21 @@ def reset_login_attempts(client_ip: str, username: str = None):
             if k in LOGIN_ATTEMPTS:
                 del LOGIN_ATTEMPTS[k]
 
+# In-memory user cache with 30-second TTL to eliminate remote DB latency
+_USER_CACHE = {}
+_USER_CACHE_LOCK = threading.Lock()
+
+def invalidate_user_cache(user_id=None):
+    """Invalidates the in-memory user cache for a specific user or all users."""
+    with _USER_CACHE_LOCK:
+        if user_id is not None:
+            _USER_CACHE.pop(user_id, None)
+        else:
+            _USER_CACHE.clear()
+
 def login_user(user_dict, remember: bool = False):
     """Logs the user into the current session, rotates security tokens, and sets cookie persistence."""
+    invalidate_user_cache(user_dict['id'])
     session.clear()
     
     # Ensure user has a security stamp in DB for session revocation
@@ -123,10 +136,13 @@ def login_user(user_dict, remember: bool = False):
 
 def logout_user():
     """Logs the current user out."""
+    uid = session.get('user_id')
+    if uid:
+        invalidate_user_cache(uid)
     session.clear()
 
 def get_current_user():
-    """Returns the current logged-in user dictionary or None, cached per-request (0ms latency on repeated calls)."""
+    """Returns the current logged-in user dictionary or None, cached in memory (0ms latency on repeated calls)."""
     from flask import has_request_context, g
     if has_request_context() and hasattr(g, '_current_user'):
         return g._current_user
@@ -137,6 +153,16 @@ def get_current_user():
             g._current_user = None
         return None
 
+    now = time.time()
+    with _USER_CACHE_LOCK:
+        cached = _USER_CACHE.get(user_id)
+        if cached:
+            user_data, expire_at = cached
+            if now < expire_at:
+                if has_request_context():
+                    g._current_user = user_data
+                return user_data
+
     conn = get_db_connection()
     user = conn.execute("""
         SELECT id, username, email, role, display_name, created_at, last_login, security_stamp,
@@ -144,6 +170,10 @@ def get_current_user():
         FROM users WHERE id = ?
     """, (user_id,)).fetchone()
     conn.close()
+
+    if user:
+        with _USER_CACHE_LOCK:
+            _USER_CACHE[user_id] = (user, now + 30)
 
     if has_request_context():
         g._current_user = user

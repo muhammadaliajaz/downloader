@@ -15,7 +15,7 @@ from core.auth import (
     hash_password, verify_password, login_user, logout_user, 
     login_required, admin_required, check_login_rate_limit, 
     record_failed_login, reset_login_attempts, validate_csrf_token,
-    get_current_user, is_safe_redirect_url
+    get_current_user, is_safe_redirect_url, invalidate_user_cache
 )
 from core.totp import (
     generate_base32_secret, get_totp_code, verify_totp_code,
@@ -355,13 +355,17 @@ def dashboard():
     """Admin dashboard with high-level statistics and recent articles."""
     conn = get_db_connection()
     
-    # Metrics
-    published_count = conn.execute("SELECT COUNT(*) FROM articles WHERE status = 'published' AND published_at <= CURRENT_TIMESTAMP").fetchone()[0]
-    drafts_count = conn.execute("SELECT COUNT(*) FROM articles WHERE status = 'draft'").fetchone()[0]
-    scheduled_count = conn.execute("SELECT COUNT(*) FROM articles WHERE status = 'scheduled'").fetchone()[0]
-    categories_count = conn.execute("SELECT COUNT(*) FROM categories").fetchone()[0]
-    total_views = conn.execute("SELECT COALESCE(SUM(views_count), 0) FROM articles").fetchone()[0]
-    media_count = conn.execute("SELECT COUNT(*) FROM media").fetchone()[0]
+    # Ultra-fast consolidated metrics query (single DB round-trip instead of 6)
+    counts = conn.execute("""
+        SELECT 
+            COUNT(CASE WHEN a.status = 'published' AND a.published_at <= CURRENT_TIMESTAMP THEN 1 END) as published_count,
+            COUNT(CASE WHEN a.status = 'draft' THEN 1 END) as drafts_count,
+            COUNT(CASE WHEN a.status = 'scheduled' THEN 1 END) as scheduled_count,
+            COALESCE(SUM(a.views_count), 0) as total_views,
+            (SELECT COUNT(*) FROM categories) as categories_count,
+            (SELECT COUNT(*) FROM media) as media_count
+        FROM articles a
+    """).fetchone()
 
     # Recent articles
     recent_articles = conn.execute("""
@@ -376,12 +380,12 @@ def dashboard():
     conn.close()
 
     stats = {
-        'published': published_count,
-        'drafts': drafts_count,
-        'scheduled': scheduled_count,
-        'categories': categories_count,
-        'views': total_views,
-        'media': media_count
+        'published': counts['published_count'] if counts else 0,
+        'drafts': counts['drafts_count'] if counts else 0,
+        'scheduled': counts['scheduled_count'] if counts else 0,
+        'categories': counts['categories_count'] if counts else 0,
+        'views': counts['total_views'] if counts else 0,
+        'media': counts['media_count'] if counts else 0
     }
 
     return render_template('admin/dashboard.html', stats=stats, recent_articles=recent_articles, current_user=get_current_user())
@@ -1041,6 +1045,7 @@ def account():
                         (display_name, username, email, current_usr['id'])
                     )
                     conn.commit()
+                    invalidate_user_cache(current_usr['id'])
                     session['username'] = username
                     session['email'] = email
                     log_audit_event('PROFILE_UPDATED', f"Admin profile updated (Username: {username}, Email: {email})", user_id=current_usr['id'], username=username, ip_address=request.remote_addr)
@@ -1076,6 +1081,7 @@ def account():
                     (new_hash, new_stamp, current_usr['id'])
                 )
                 conn.commit()
+                invalidate_user_cache(current_usr['id'])
                 # Update current session security stamp so this session stays active
                 session['security_stamp'] = new_stamp
                 log_audit_event('PASSWORD_CHANGED', 'Admin account password changed; all other active sessions revoked', user_id=current_usr['id'], username=current_usr['username'], ip_address=request.remote_addr)

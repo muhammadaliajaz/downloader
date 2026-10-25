@@ -230,8 +230,16 @@
                 const dt = e.dataTransfer;
                 const files = dt && dt.files;
                 if (files && files.length) {
-                    fileInput.files = files;
-                    uploadForm.submit();
+                    try {
+                        fileInput.files = files;
+                        uploadForm.submit();
+                    } catch (err) {
+                        const fd = new FormData(uploadForm);
+                        fd.set('file', files[0]);
+                        fetch(uploadForm.action, { method: 'POST', body: fd })
+                            .then(() => window.location.reload())
+                            .catch(() => uploadForm.submit());
+                    }
                 }
             });
         }

@@ -4,8 +4,28 @@
 {% block page_title %}{{ 'Edit Article' if is_edit else 'Article Editor' }}{% endblock %}
 
 {% block extra_css %}
-<link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
+<link rel="stylesheet" href="{{ url_for('static', filename='css/quill.snow.css') }}">
 <style>
+    #quill-editor {
+        min-height: 420px;
+        font-family: inherit;
+        font-size: 1rem;
+        line-height: 1.6;
+        background: #ffffff;
+    }
+    .ql-toolbar.ql-snow {
+        border-top-left-radius: var(--radius-md);
+        border-top-right-radius: var(--radius-md);
+        border-color: var(--admin-border);
+        background: #fbfdfc;
+    }
+    .ql-container.ql-snow {
+        border-bottom-left-radius: var(--radius-md);
+        border-bottom-right-radius: var(--radius-md);
+        border-color: var(--admin-border);
+        font-family: inherit;
+        min-height: 420px;
+    }
     .seo-drawer {
         background: #fbfdfc;
         border: 1px solid var(--admin-border);
@@ -431,12 +451,24 @@
 {% endblock %}
 
 {% block extra_js %}
-<script nonce="{{ csp_nonce }}" src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+<script nonce="{{ csp_nonce }}" src="{{ url_for('static', filename='js/quill.min.js') }}"></script>
 <script nonce="{{ csp_nonce }}">
-    // Initialize Quill Editor safely
+    // Global Quill instance reference
     let quill = null;
-    try {
-        if (typeof Quill !== 'undefined' && document.getElementById('quill-editor')) {
+
+    function initQuill() {
+        const editorContainer = document.getElementById('quill-editor');
+        if (!editorContainer) return;
+
+        if (typeof Quill === 'undefined') {
+            console.warn('Quill library not loaded yet; will retry shortly.');
+            setTimeout(initQuill, 200);
+            return;
+        }
+
+        if (quill) return; // Already initialized
+
+        try {
             quill = new Quill('#quill-editor', {
                 theme: 'snow',
                 modules: {
@@ -449,9 +481,10 @@
                 },
                 placeholder: 'Write your engaging article content here...'
             });
+            console.log('Quill editor initialized successfully.');
+        } catch (e) {
+            console.error('Quill editor initialization error:', e);
         }
-    } catch (e) {
-        console.warn('Quill editor initialization notice:', e);
     }
 
     // Custom Quill Image Upload Handler
@@ -483,7 +516,7 @@
                 });
                 const data = await res.json();
                 if (res.ok && data.url) {
-                    const range = quill.getSelection(true);
+                    const range = (quill && quill.getSelection(true)) || { index: 0 };
                     quill.insertEmbed(range.index, 'image', data.url);
                 } else {
                     alert(data.error || 'Failed to upload image.');
@@ -600,10 +633,12 @@
 
     // Media Modal
     function openMediaModal() {
-        document.getElementById('mediaModalBackdrop').style.display = 'flex';
+        const backdrop = document.getElementById('mediaModalBackdrop');
+        if (backdrop) backdrop.style.display = 'flex';
     }
     function closeMediaModal() {
-        document.getElementById('mediaModalBackdrop').style.display = 'none';
+        const backdrop = document.getElementById('mediaModalBackdrop');
+        if (backdrop) backdrop.style.display = 'none';
     }
     function selectMediaImage(url) {
         setFeaturedImage(url);
@@ -611,8 +646,8 @@
     }
 
     // Auto-slug generator
-    const postFormEl = document.getElementById('postForm');
-    let autoSlug = postFormEl ? postFormEl.dataset.isEdit !== '1' : true;
+    const postForm = document.getElementById('postForm');
+    let autoSlug = postForm ? postForm.dataset.isEdit !== '1' : true;
     const titleInput = document.getElementById('postTitle');
     const slugInput = document.getElementById('postSlug');
     const slugLockBtn = document.getElementById('slugLockBtn');
@@ -626,50 +661,53 @@
             .replace(/-+$/, '');
     }
 
-    titleInput.addEventListener('input', () => {
-        if (autoSlug) {
-            slugInput.value = slugify(titleInput.value);
-        }
-    });
+    if (titleInput && slugInput) {
+        titleInput.addEventListener('input', () => {
+            if (autoSlug) {
+                slugInput.value = slugify(titleInput.value);
+            }
+        });
+    }
 
-    slugInput.addEventListener('input', () => {
-        autoSlug = false;
-        slugLockBtn.style.color = 'var(--admin-text-dim)';
-    });
+    if (slugInput && slugLockBtn) {
+        slugInput.addEventListener('input', () => {
+            autoSlug = false;
+            slugLockBtn.style.color = 'var(--admin-text-dim)';
+        });
 
-    slugLockBtn.addEventListener('click', () => {
-        autoSlug = true;
-        slugInput.value = slugify(titleInput.value);
-        slugLockBtn.style.color = 'var(--admin-primary)';
-    });
+        slugLockBtn.addEventListener('click', () => {
+            autoSlug = true;
+            if (titleInput) slugInput.value = slugify(titleInput.value);
+            slugLockBtn.style.color = 'var(--admin-primary)';
+        });
+    }
 
     // Top button trigger
     function triggerMainSubmit() {
-        document.getElementById('postForm').requestSubmit();
+        const f = document.getElementById('postForm');
+        if (f) f.requestSubmit();
     }
 
     // Status change listener
     function handleStatusChange() {
         const sel = document.getElementById('postStatusSelect');
+        if (!sel) return;
         const status = sel.value;
         const schedGroup = document.getElementById('scheduleDateGroup');
         const submitText = document.getElementById('submitBtnText');
         const sheetSubmitText = document.getElementById('sheetSubmitText');
 
         if (status === 'scheduled') {
-            schedGroup.classList.remove('d-none');
-            schedGroup.style.display = 'block';
-            submitText.innerText = 'Schedule Publication';
+            if (schedGroup) { schedGroup.classList.remove('d-none'); schedGroup.style.display = 'block'; }
+            if (submitText) submitText.innerText = 'Schedule Publication';
             if (sheetSubmitText) sheetSubmitText.innerText = 'Schedule Publication';
         } else if (status === 'published') {
-            schedGroup.classList.add('d-none');
-            schedGroup.style.display = 'none';
-            submitText.innerText = 'Publish Now';
+            if (schedGroup) { schedGroup.classList.add('d-none'); schedGroup.style.display = 'none'; }
+            if (submitText) submitText.innerText = 'Publish Now';
             if (sheetSubmitText) sheetSubmitText.innerText = 'Publish Now';
         } else {
-            schedGroup.classList.add('d-none');
-            schedGroup.style.display = 'none';
-            submitText.innerText = 'Save as Draft';
+            if (schedGroup) { schedGroup.classList.add('d-none'); schedGroup.style.display = 'none'; }
+            if (submitText) submitText.innerText = 'Save as Draft';
             if (sheetSubmitText) sheetSubmitText.innerText = 'Save as Draft';
         }
     }
@@ -679,26 +717,25 @@
     function toggleSeoDrawer() {
         const body = document.getElementById('seoDrawerBody');
         const icon = document.getElementById('seoDrawerIcon');
+        if (!body) return;
         seoOpen = !seoOpen;
         if (seoOpen) {
             body.style.display = 'flex';
-            icon.className = 'fa-solid fa-chevron-up';
+            if (icon) icon.className = 'fa-solid fa-chevron-up';
         } else {
             body.style.display = 'none';
-            icon.className = 'fa-solid fa-chevron-down';
+            if (icon) icon.className = 'fa-solid fa-chevron-down';
         }
     }
 
     function openSeoDrawerTab() {
         const body = document.getElementById('seoDrawerBody');
         const icon = document.getElementById('seoDrawerIcon');
+        if (!body) return;
         seoOpen = true;
         body.style.display = 'flex';
-        icon.className = 'fa-solid fa-chevron-up';
+        if (icon) icon.className = 'fa-solid fa-chevron-up';
     }
-
-    // Initially closed
-    document.getElementById('seoDrawerBody').style.display = 'none';
 
     // Character counters
     function setupCharCounter(inputId, counterId, max) {
@@ -716,11 +753,14 @@
     setupCharCounter('meta_description', 'metaDescCount', 160);
 
     // Sync Quill HTML to hidden input before form submit
-    const postFormEl = document.getElementById('postForm');
-    if (postFormEl) {
-        postFormEl.addEventListener('submit', function() {
+    if (postForm) {
+        postForm.addEventListener('submit', function() {
+            const hidden = document.getElementById('hiddenContent');
             if (quill && quill.root) {
-                document.getElementById('hiddenContent').value = quill.root.innerHTML;
+                hidden.value = quill.root.innerHTML;
+            } else {
+                const ed = document.getElementById('quill-editor');
+                if (ed && hidden) hidden.value = ed.innerHTML;
             }
         });
     }
@@ -737,7 +777,29 @@
         }
     }
 
+    // Expose helpers globally so inline event handlers work
+    window.quillImageHandler = quillImageHandler;
+    window.uploadDirectFeatured = uploadDirectFeatured;
+    window.setFeaturedImage = setFeaturedImage;
+    window.removeFeaturedImage = removeFeaturedImage;
+    window.openMediaModal = openMediaModal;
+    window.closeMediaModal = closeMediaModal;
+    window.selectMediaImage = selectMediaImage;
+    window.slugify = slugify;
+    window.triggerMainSubmit = triggerMainSubmit;
+    window.handleStatusChange = handleStatusChange;
+    window.toggleSeoDrawer = toggleSeoDrawer;
+    window.openSeoDrawerTab = openSeoDrawerTab;
+    window.confirmDeleteCurrentPost = confirmDeleteCurrentPost;
+
     function initPostFormListeners() {
+        // Initialize Quill
+        initQuill();
+
+        // Initially close SEO Drawer
+        const seoBody = document.getElementById('seoDrawerBody');
+        if (seoBody) seoBody.style.display = 'none';
+
         // Trigger submit buttons
         document.querySelectorAll('.btn-trigger-submit').forEach(btn => {
             btn.addEventListener('click', triggerMainSubmit);
