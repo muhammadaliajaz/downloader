@@ -42,7 +42,7 @@
             <form method="POST" enctype="multipart/form-data" action="{{ url_for('admin.media_library') }}" id="mediaUploadForm">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-                <div id="dropZone" class="dropzone-box">
+                <div id="dropZone" class="dropzone-box" style="cursor: pointer;">
                     <div style="font-size: 38px; color: var(--admin-primary); margin-bottom: 12px;">
                         <i class="fa-solid fa-cloud-arrow-up"></i>
                     </div>
@@ -50,7 +50,7 @@
                     <p style="color: var(--admin-text-muted); font-size: 0.82rem; margin-bottom: 16px;">Supports JPG, PNG, WebP, GIF, SVG (Max file size: 5 MB)</p>
                     
                     <input type="file" name="file" id="fileInput" accept="image/*" style="display: none;">
-                    <button type="button" class="btn-dark-pill btn-browse-file" style="display: inline-flex;">
+                    <button type="button" class="btn-dark-pill btn-browse-file" style="display: inline-flex; cursor: pointer;">
                         <i class="fa-solid fa-folder-open"></i>
                         <span>Select File from Computer</span>
                     </button>
@@ -125,78 +125,122 @@
 
 {% block extra_js %}
 <script nonce="{{ csp_nonce }}">
-    // Copy URL function with tooltip notification
-    function copyMediaUrl(relativeUrl, btn) {
-        const fullUrl = window.location.origin + relativeUrl;
-        navigator.clipboard.writeText(fullUrl).then(() => {
-            const originalIcon = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-check" style="color: #065f46;"></i>';
-            setTimeout(() => {
-                btn.innerHTML = originalIcon;
-            }, 1800);
-        }).catch(err => {
-            prompt('Copy image URL:', fullUrl);
+    function initMediaLibrary() {
+        const fileInput = document.getElementById('fileInput');
+        const dropZone = document.getElementById('dropZone');
+        const uploadForm = document.getElementById('mediaUploadForm');
+
+        function copyMediaUrl(relativeUrl, btn) {
+            const fullUrl = window.location.origin + relativeUrl;
+            const showSuccess = () => {
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-check" style="color: #065f46;"></i>';
+                setTimeout(() => { btn.innerHTML = originalHtml; }, 2000);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(fullUrl).then(showSuccess).catch(() => {
+                    fallbackCopy(fullUrl, btn, showSuccess);
+                });
+            } else {
+                fallbackCopy(fullUrl, btn, showSuccess);
+            }
+        }
+
+        function fallbackCopy(text, btn, callback) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.top = "0";
+            textArea.style.left = "-9999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                if (callback) callback();
+            } catch (err) {
+                prompt('Copy image URL:', text);
+            }
+            document.body.removeChild(textArea);
+        }
+
+        // Browse button clicks
+        document.querySelectorAll('.btn-browse-file').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                fileInput?.click();
+            });
         });
+
+        // Clicking anywhere on dropZone opens file dialog
+        if (dropZone && fileInput) {
+            dropZone.addEventListener('click', (e) => {
+                if (!e.target.closest('.btn-browse-file') && e.target !== fileInput) {
+                    fileInput.click();
+                }
+            });
+        }
+
+        // Copy button clicks
+        document.querySelectorAll('.btn-copy-media-url').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const url = this.getAttribute('data-url');
+                if (url) copyMediaUrl(url, this);
+            });
+        });
+
+        // Auto submit when file selected
+        if (fileInput && uploadForm) {
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files && fileInput.files.length) {
+                    uploadForm.submit();
+                }
+            });
+        }
+
+        // Mobile active toggle
+        document.querySelectorAll('.media-item').forEach(item => {
+            item.addEventListener('click', function() {
+                this.classList.toggle('active-mobile');
+            });
+        });
+
+        // Drag and drop setup
+        if (dropZone && fileInput && uploadForm) {
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropZone.style.borderColor = 'var(--admin-primary)';
+                    dropZone.style.background = '#edf5f0';
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropZone.style.borderColor = 'var(--admin-border)';
+                    dropZone.style.background = '#fbfdfc';
+                }, false);
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt && dt.files;
+                if (files && files.length) {
+                    fileInput.files = files;
+                    uploadForm.submit();
+                }
+            });
+        }
     }
 
-    document.querySelectorAll('.btn-browse-file').forEach(btn => {
-        btn.addEventListener('click', () => document.getElementById('fileInput')?.click());
-    });
-    document.querySelectorAll('.btn-copy-media-url').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            copyMediaUrl(this.dataset.url, this);
-        });
-    });
-    document.querySelectorAll('.media-item').forEach(item => {
-        item.addEventListener('click', function() {
-            this.classList.toggle('active-mobile');
-        });
-    });
-    document.querySelectorAll('.form-confirm-delete').forEach(form => {
-        form.addEventListener('submit', function(e) {
-            e.stopPropagation();
-            if (!confirm(this.dataset.confirm || 'Permanently delete this media file?')) {
-                e.preventDefault();
-            }
-        });
-    });
-
-    // Drag and drop setup
-    const dropZone = document.getElementById('dropZone');
-    const fileInput = document.getElementById('fileInput');
-
-    if (dropZone && fileInput) {
-        fileInput.addEventListener('change', () => {
-            if (fileInput.files.length) {
-                document.getElementById('mediaUploadForm').submit();
-            }
-        });
-
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropZone.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                dropZone.style.borderColor = 'var(--admin-primary)';
-                dropZone.style.background = '#edf5f0';
-            }, false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                dropZone.style.borderColor = 'var(--admin-border)';
-                dropZone.style.background = '#fbfdfc';
-            }, false);
-        });
-
-        dropZone.addEventListener('drop', (e) => {
-            const dt = e.dataTransfer;
-            const files = dt.files;
-            if (files.length) {
-                fileInput.files = files;
-                document.getElementById('mediaUploadForm').submit();
-            }
-        });
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initMediaLibrary);
+    } else {
+        initMediaLibrary();
     }
 </script>
 {% endblock %}

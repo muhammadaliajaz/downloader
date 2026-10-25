@@ -319,13 +319,13 @@
                         <input type="hidden" name="featured_image" id="featuredImageInput" value="{{ post.featured_image or '' }}">
 
                         <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-                            <label class="btn-secondary" style="flex: 1; justify-content: center; font-size: 0.85rem; cursor: pointer;">
+                            <button type="button" class="btn-secondary" id="btnUploadFeatured" style="flex: 1; justify-content: center; font-size: 0.85rem; cursor: pointer;">
                                 <i class="fa-solid fa-upload"></i>
                                 <span>Upload</span>
-                                <input type="file" id="directFeaturedUpload" accept="image/*" style="display: none;">
-                            </label>
+                            </button>
+                            <input type="file" id="directFeaturedUpload" accept="image/*" style="display: none;">
 
-                            <button type="button" class="btn-secondary" id="openMediaModalBtn" style="flex: 1; justify-content: center; font-size: 0.85rem;">
+                            <button type="button" class="btn-secondary" id="openMediaModalBtn" style="flex: 1; justify-content: center; font-size: 0.85rem; cursor: pointer;">
                                 <i class="fa-solid fa-folder-open"></i>
                                 <span>Library</span>
                             </button>
@@ -395,13 +395,6 @@
     <form id="deleteCurrentPostForm" method="POST" action="{{ url_for('admin.post_delete', post_id=post.id) }}" style="display:none;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     </form>
-    <script nonce="{{ csp_nonce }}">
-        function confirmDeleteCurrentPost() {
-            if (confirm("WARNING: Are you sure you want to permanently delete '{{ post.title|replace('\"', '\\\"') }}'? This action cannot be undone.")) {
-                document.getElementById('deleteCurrentPostForm').submit();
-            }
-        }
-    </script>
 {% endif %}
 
 <!-- Media Selection Modal -->
@@ -440,19 +433,26 @@
 {% block extra_js %}
 <script nonce="{{ csp_nonce }}" src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
 <script nonce="{{ csp_nonce }}">
-    // Initialize Quill Editor
-    const quill = new Quill('#quill-editor', {
-        theme: 'snow',
-        modules: {
-            toolbar: {
-                container: '#quill-toolbar',
-                handlers: {
-                    image: quillImageHandler
-                }
-            }
-        },
-        placeholder: 'Write your engaging article content here...'
-    });
+    // Initialize Quill Editor safely
+    let quill = null;
+    try {
+        if (typeof Quill !== 'undefined' && document.getElementById('quill-editor')) {
+            quill = new Quill('#quill-editor', {
+                theme: 'snow',
+                modules: {
+                    toolbar: {
+                        container: '#quill-toolbar',
+                        handlers: {
+                            image: quillImageHandler
+                        }
+                    }
+                },
+                placeholder: 'Write your engaging article content here...'
+            });
+        }
+    } catch (e) {
+        console.warn('Quill editor initialization notice:', e);
+    }
 
     // Custom Quill Image Upload Handler
     function quillImageHandler() {
@@ -716,23 +716,112 @@
     setupCharCounter('meta_description', 'metaDescCount', 160);
 
     // Sync Quill HTML to hidden input before form submit
-    document.getElementById('postForm').addEventListener('submit', function() {
-        document.getElementById('hiddenContent').value = quill.root.innerHTML;
-    });
-
-    // Unobtrusive Event Listeners for CSP Compliance
-    document.querySelectorAll('.btn-trigger-submit').forEach(btn => btn.addEventListener('click', triggerMainSubmit));
-    document.querySelectorAll('.btn-delete-post').forEach(btn => btn.addEventListener('click', confirmDeleteCurrentPost));
-    document.getElementById('postStatusSelect')?.addEventListener('change', handleStatusChange);
-    document.getElementById('directFeaturedUpload')?.addEventListener('change', function() { uploadDirectFeatured(this); });
-    document.getElementById('seoDrawerToggle')?.addEventListener('click', toggleSeoDrawer);
-    document.getElementById('openMediaModalBtn')?.addEventListener('click', openMediaModal);
-    document.getElementById('closeMediaModalBtn')?.addEventListener('click', closeMediaModal);
-    document.getElementById('removeImgBtn')?.addEventListener('click', removeFeaturedImage);
-    document.querySelectorAll('.media-picker-select').forEach(item => {
-        item.addEventListener('click', function() {
-            selectMediaImage(this.dataset.mediaUrl);
+    const postFormEl = document.getElementById('postForm');
+    if (postFormEl) {
+        postFormEl.addEventListener('submit', function() {
+            if (quill && quill.root) {
+                document.getElementById('hiddenContent').value = quill.root.innerHTML;
+            }
         });
-    });
+    }
+
+    // Always define confirmDeleteCurrentPost globally
+    function confirmDeleteCurrentPost() {
+        const delForm = document.getElementById('deleteCurrentPostForm');
+        if (!delForm) {
+            alert('Delete action is only available for existing saved articles.');
+            return;
+        }
+        if (confirm("WARNING: Are you sure you want to permanently delete this article? This action cannot be undone.")) {
+            delForm.submit();
+        }
+    }
+
+    function initPostFormListeners() {
+        // Trigger submit buttons
+        document.querySelectorAll('.btn-trigger-submit').forEach(btn => {
+            btn.addEventListener('click', triggerMainSubmit);
+        });
+
+        // Delete post buttons
+        document.querySelectorAll('.btn-delete-post').forEach(btn => {
+            btn.addEventListener('click', confirmDeleteCurrentPost);
+        });
+
+        // Status change
+        const statusSel = document.getElementById('postStatusSelect');
+        if (statusSel) {
+            statusSel.addEventListener('change', handleStatusChange);
+        }
+
+        // Direct upload button & file input
+        const featuredUpload = document.getElementById('directFeaturedUpload');
+        const uploadBtn = document.getElementById('btnUploadFeatured');
+        if (uploadBtn && featuredUpload) {
+            uploadBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                featuredUpload.click();
+            });
+        }
+        if (featuredUpload) {
+            featuredUpload.addEventListener('change', function() {
+                uploadDirectFeatured(this);
+            });
+        }
+
+        // Click on empty preview triggers upload
+        const previewBox = document.getElementById('featuredImgPreview');
+        if (previewBox && featuredUpload) {
+            previewBox.addEventListener('click', () => {
+                const curVal = document.getElementById('featuredImageInput')?.value;
+                if (!curVal) {
+                    featuredUpload.click();
+                }
+            });
+        }
+
+        // SEO Drawer Toggle: Listen on drawer header AND on card title
+        const seoToggle = document.getElementById('seoDrawerToggle');
+        if (seoToggle) {
+            seoToggle.style.cursor = 'pointer';
+            seoToggle.addEventListener('click', toggleSeoDrawer);
+        }
+        const seoCardTitle = document.querySelector('#seoDrawerSection .form-card-title');
+        if (seoCardTitle) {
+            seoCardTitle.style.cursor = 'pointer';
+            seoCardTitle.addEventListener('click', toggleSeoDrawer);
+        }
+
+        // Media Library Modal
+        const openMediaBtn = document.getElementById('openMediaModalBtn');
+        if (openMediaBtn) openMediaBtn.addEventListener('click', openMediaModal);
+
+        const closeMediaBtn = document.getElementById('closeMediaModalBtn');
+        if (closeMediaBtn) closeMediaBtn.addEventListener('click', closeMediaModal);
+
+        const modalBackdrop = document.getElementById('mediaModalBackdrop');
+        if (modalBackdrop) {
+            modalBackdrop.addEventListener('click', (e) => {
+                if (e.target === modalBackdrop) closeMediaModal();
+            });
+        }
+
+        // Remove Featured Image
+        const removeImgBtn = document.getElementById('removeImgBtn');
+        if (removeImgBtn) removeImgBtn.addEventListener('click', removeFeaturedImage);
+
+        // Media item selector in modal
+        document.querySelectorAll('.media-picker-select').forEach(item => {
+            item.addEventListener('click', function() {
+                selectMediaImage(this.dataset.mediaUrl);
+            });
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initPostFormListeners);
+    } else {
+        initPostFormListeners();
+    }
 </script>
 {% endblock %}

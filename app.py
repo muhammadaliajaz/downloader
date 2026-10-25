@@ -24,7 +24,7 @@ from core.security import (
 from datetime import timedelta
 
 # CMS & Database Layer
-from core.db import init_db, get_all_settings, get_db_connection
+from core.db import init_db, get_all_settings, get_db_connection, prewarm_database_pool
 from core.auth import generate_csrf_token, validate_csrf_token, get_current_user, login_required, admin_required
 from core.blog_routes import blog_bp
 from core.admin_routes import admin_bp
@@ -128,6 +128,9 @@ os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 
 # Start background cleanup scheduler for temporary files (every 10 minutes)
 start_cleanup_scheduler(DOWNLOADS_DIR)
+
+# Pre-warm Supabase PostgreSQL connection pool asynchronously for instant page loads
+prewarm_database_pool()
 
 # Custom Security Error Handlers (Prevents Framework Information Disclosure)
 @app.errorhandler(400)

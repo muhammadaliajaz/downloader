@@ -659,29 +659,48 @@ def _init_sqlite_db(conn):
 # Application Helper Functions
 # ============================================================================
 
-def check_and_publish_scheduled():
+_LAST_SCHEDULE_CHECK = 0
+_SCHEDULE_LOCK = threading.Lock()
+
+def check_and_publish_scheduled(force=False):
     """
     Checks for articles whose scheduled publishing time has arrived
     and transitions them from 'scheduled' to 'published'.
+    In PostgreSQL production, throttled to at most once per 60s to eliminate request latency.
     """
-    with DB_LOCK:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        now_iso = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-        cursor.execute('''
-            UPDATE articles
-            SET status = 'published',
-                published_at = COALESCE(scheduled_for, CURRENT_TIMESTAMP),
-                updated_at = CURRENT_TIMESTAMP
-            WHERE status = 'scheduled'
-              AND scheduled_for IS NOT NULL
-              AND scheduled_for <= ?
-        ''', (now_iso,))
-        updated_count = cursor.rowcount
-        if updated_count and updated_count > 0:
-            conn.commit()
-        conn.close()
-        return updated_count or 0
+    global _LAST_SCHEDULE_CHECK
+    now = time.time()
+    if is_postgres_enabled() and not force and (now - _LAST_SCHEDULE_CHECK < 60):
+        return 0
+
+    with _SCHEDULE_LOCK:
+        if is_postgres_enabled() and not force and (now - _LAST_SCHEDULE_CHECK < 60):
+            return 0
+        _LAST_SCHEDULE_CHECK = now
+        with DB_LOCK:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            now_iso = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+            cursor.execute('''
+                UPDATE articles
+                SET status = 'published',
+                    published_at = COALESCE(scheduled_for, CURRENT_TIMESTAMP),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE status = 'scheduled'
+                  AND scheduled_for IS NOT NULL
+                  AND scheduled_for <= ?
+            ''', (now_iso,))
+            updated_count = cursor.rowcount
+            if updated_count and updated_count > 0:
+                conn.commit()
+            conn.close()
+            return updated_count or 0
+
+def prewarm_database_pool():
+    """Pre-warms the Supabase connection pool asynchronously on application startup."""
+    if is_postgres_enabled():
+        t = threading.Thread(target=_get_pg_pool, daemon=True)
+        t.start()
 
 _SETTINGS_CACHE = None
 _SETTINGS_CACHE_TIME = 0
