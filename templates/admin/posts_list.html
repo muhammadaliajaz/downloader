@@ -39,14 +39,14 @@
                 <input type="text" name="q" value="{{ search_query }}" placeholder="Search articles by title or slug..." class="table-search-input" style="width: 100%;">
             </div>
 
-            <select name="status" class="select-filter" onchange="this.form.submit()">
+            <select name="status" class="select-filter auto-submit-select">
                 <option value="">All Statuses</option>
                 <option value="published" {% if selected_status == 'published' %}selected{% endif %}>Published</option>
                 <option value="draft" {% if selected_status == 'draft' %}selected{% endif %}>Drafts</option>
                 <option value="scheduled" {% if selected_status == 'scheduled' %}selected{% endif %}>Scheduled</option>
             </select>
 
-            <select name="category_id" class="select-filter" onchange="this.form.submit()">
+            <select name="category_id" class="select-filter auto-submit-select">
                 <option value="">All Categories</option>
                 {% for cat in categories %}
                     <option value="{{ cat.id }}" {% if selected_category == cat.id %}selected{% endif %}>{{ cat.name }}</option>
@@ -166,7 +166,7 @@
                                         </a>
 
                                         <!-- Delete Post -->
-                                        <form method="POST" action="{{ url_for('admin.post_delete', post_id=post.id) }}" style="display:inline;" onsubmit="return confirm('Are you sure you want to permanently delete &quot;{{ post.title }}&quot;?');">
+                                        <form method="POST" action="{{ url_for('admin.post_delete', post_id=post.id) }}" style="display:inline;" class="confirm-action-form" data-confirm-msg="Are you sure you want to permanently delete this article?">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button type="submit" class="btn-icon danger" title="Delete Article" style="color: #dc2626 !important; background: #fee2e2 !important; border: 1px solid #fca5a5 !important; cursor: pointer;">
                                                 <i class="fa-solid fa-trash-can" style="color: #dc2626 !important;"></i>

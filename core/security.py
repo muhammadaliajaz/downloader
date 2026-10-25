@@ -179,38 +179,102 @@ def is_safe_filepath(file_path, base_directory):
     # Common prefix check with separator to prevent path prefix matching attacks
     return os.path.commonpath([target_abs, base_abs]) == base_abs
 
+# ============================================================================
+# Thread-Isolated SSRF Protection with DNS Rebinding Defense (IP Pinning)
+# ============================================================================
+
+_SSRF_TLS = threading.local()
+_ORIGINAL_CREATE_CONNECTION = socket.create_connection
+_HOOK_LOCK = threading.Lock()
+_HOOK_INSTALLED = False
+
+def _safe_create_connection(address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None, **kwargs):
+    """
+    Thread-safe connection hook that pins to verified safe IP addresses.
+    Only acts when active on the current thread (_SSRF_TLS.active is True).
+    Blocks DNS rebinding by connecting directly to the validated IP, not the hostname.
+    """
+    if not getattr(_SSRF_TLS, 'active', False):
+        if source_address:
+            return _ORIGINAL_CREATE_CONNECTION(address, timeout, source_address=source_address, **kwargs)
+        return _ORIGINAL_CREATE_CONNECTION(address, timeout, **kwargs)
+
+    host, port = address[0], address[1]
+
+    # 1. Direct IP Check
+    try:
+        ip = ipaddress.ip_address(host)
+        if is_prohibited_ip(ip):
+            raise socket.error(f"SSRF Guard: Prohibited IP destination {ip}")
+        # Pin directly to verified IP
+        if source_address:
+            return _ORIGINAL_CREATE_CONNECTION((str(ip), port), timeout, source_address=source_address, **kwargs)
+        return _ORIGINAL_CREATE_CONNECTION((str(ip), port), timeout, **kwargs)
+    except ValueError:
+        pass
+
+    # 2. Hostname Resolution with DNS Rebinding Defense (IP Pinning)
+    try:
+        addrs = socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        if not addrs:
+            raise socket.gaierror(f"SSRF Guard: Domain {host} could not be resolved")
+
+        # Verify all resolved IPs first (reject immediately if dual-homed to private IP)
+        safe_addrs = []
+        for addr in addrs:
+            ip_str = addr[4][0]
+            ip = ipaddress.ip_address(ip_str)
+            if is_prohibited_ip(ip):
+                raise socket.error(f"SSRF Guard: Prohibited resolved IP destination {ip} for {host}")
+            safe_addrs.append(addr)
+    except socket.gaierror as e:
+        raise socket.error(f"SSRF Guard: Domain resolution error for {host}: {str(e)}")
+
+    # 3. Connect to the validated socket addresses directly (prevents secondary DNS rebinding lookup)
+    last_err = None
+    for af, socktype, proto, canonname, sa in safe_addrs:
+        sock = None
+        try:
+            sock = socket.socket(af, socktype, proto)
+            if timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:
+                sock.settimeout(timeout)
+            if source_address:
+                sock.bind(source_address)
+            sock.connect(sa)
+            return sock
+        except socket.error as err:
+            last_err = err
+            if sock is not None:
+                sock.close()
+
+    if last_err is not None:
+        raise last_err
+    raise socket.error(f"SSRF Guard: Unable to connect to verified addresses for {host}")
+
+def _install_ssrf_socket_hook():
+    global _HOOK_INSTALLED
+    with _HOOK_LOCK:
+        if not _HOOK_INSTALLED:
+            socket.create_connection = _safe_create_connection
+            _HOOK_INSTALLED = True
+
+# Install hook permanently at module load time
+_install_ssrf_socket_hook()
+
 @contextmanager
 def ssrf_safe_socket():
     """
-    Context manager that intercepts socket.create_connection during external fetches.
-    Guarantees that DNS rebinding and HTTP 30x redirects to private/loopback/cloud
-    metadata addresses are blocked at the socket connection level.
+    Context manager that activates thread-isolated SSRF protection for the current thread.
+    - Completely eliminates concurrency races (each thread has its own isolated flag).
+    - Prevents DNS rebinding by pinning outbound sockets directly to verified IP addresses.
+    - Preserves TLS SNI and HTTP Host headers for full HTTPS/CDN compatibility.
     """
-    orig_create_connection = socket.create_connection
-
-    def guarded_create_connection(address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None, **kwargs):
-        host, port = address[0], address[1]
-        try:
-            ip = ipaddress.ip_address(host)
-            if is_prohibited_ip(ip):
-                raise socket.error(f"SSRF Guard: Prohibited IP destination {ip}")
-        except ValueError:
-            try:
-                addrs = socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
-                for addr in addrs:
-                    ip = ipaddress.ip_address(addr[4][0])
-                    if is_prohibited_ip(ip):
-                        raise socket.error(f"SSRF Guard: Prohibited resolved IP destination {ip} for {host}")
-            except socket.gaierror:
-                raise socket.error(f"SSRF Guard: Domain {host} could not be resolved")
-
-        if source_address:
-            return orig_create_connection(address, timeout, source_address=source_address, **kwargs)
-        return orig_create_connection(address, timeout, **kwargs)
-
-    socket.create_connection = guarded_create_connection
+    _install_ssrf_socket_hook()
+    prev_state = getattr(_SSRF_TLS, 'active', False)
+    _SSRF_TLS.active = True
     try:
         yield
     finally:
-        socket.create_connection = orig_create_connection
+        _SSRF_TLS.active = prev_state
+
 

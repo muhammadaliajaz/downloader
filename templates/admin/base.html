@@ -167,7 +167,7 @@
                                     {% endif %}
                                     <span>{{ message }}</span>
                                 </div>
-                                <button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; color:inherit; cursor:pointer; font-size:16px;">
+                                <button type="button" class="flash-close-btn" style="background:none; border:none; color:inherit; cursor:pointer; font-size:16px;" aria-label="Dismiss">
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
                             </div>
@@ -203,6 +203,25 @@
             if (backdrop) backdrop.addEventListener('click', closeSidebar);
             window.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') closeSidebar();
+            });
+
+            document.querySelectorAll('.flash-close-btn').forEach(btn => {
+                btn.addEventListener('click', () => btn.closest('.flash-msg')?.remove());
+            });
+
+            document.querySelectorAll('form.confirm-action-form').forEach(form => {
+                form.addEventListener('submit', (e) => {
+                    const msg = form.getAttribute('data-confirm-msg') || 'Are you sure you want to proceed?';
+                    if (!confirm(msg)) {
+                        e.preventDefault();
+                    }
+                });
+            });
+
+            document.querySelectorAll('select.auto-submit-select').forEach(select => {
+                select.addEventListener('change', () => {
+                    if (select.form) select.form.submit();
+                });
             });
 
             // 30-Minute Inactivity Auto-Logout Security Guard

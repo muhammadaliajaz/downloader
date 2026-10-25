@@ -1697,3 +1697,35 @@ body {
   color: var(--swatch-5);
   font-size: 12px;
 }
+
+/* CMS Recent Articles Section */
+.view-all-articles-link {
+  color: var(--swatch-6);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.88rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 9999px;
+  background: rgba(214, 237, 228, 0.08);
+  border: 1px solid rgba(214, 237, 228, 0.2);
+  transition: all 0.2s ease;
+}
+
+.view-all-articles-link:hover {
+  background: rgba(214, 237, 228, 0.16);
+  color: #ffffff;
+}
+
+.article-card-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.article-card-thumb:hover {
+  transform: scale(1.04);
+}

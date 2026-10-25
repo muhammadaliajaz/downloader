@@ -245,7 +245,7 @@ def apply_security_headers(response):
     nonce_script = f"'nonce-{nonce}' " if nonce else ""
     csp_directives = [
         "default-src 'self'",
-        f"script-src 'self' {nonce_script}'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
+        f"script-src 'self' {nonce_script}https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
         "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://cdn.jsdelivr.net",
         "font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com data:",
         "img-src 'self' data: https: blob:",

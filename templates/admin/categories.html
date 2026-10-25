@@ -108,7 +108,7 @@
                                                     <i class="fa-solid fa-arrow-up-right-from-square"></i>
                                                 </a>
 
-                                                <form method="POST" action="{{ url_for('admin.category_delete', cat_id=cat.id) }}" style="display:inline;" onsubmit="return confirm('Delete this category? Existing articles will remain and become uncategorized.');">
+                                                <form method="POST" action="{{ url_for('admin.category_delete', cat_id=cat.id) }}" style="display:inline;" class="confirm-action-form" data-confirm-msg="Delete this category? Existing articles will remain and become uncategorized.">
                                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                     <button type="submit" class="btn-icon danger" title="Delete Category">
                                                         <i class="fa-solid fa-trash-can"></i>

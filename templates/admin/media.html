@@ -19,7 +19,7 @@
         </div>
 
         <div class="cms-actions-group">
-            <button type="button" class="btn-dark-pill" onclick="document.getElementById('fileInput').click()">
+            <button type="button" class="btn-dark-pill btn-browse-file">
                 <i class="fa-solid fa-cloud-arrow-up"></i>
                 <span>Upload New Asset</span>
             </button>
@@ -49,8 +49,8 @@
                     <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--admin-text-main); margin-bottom: 6px;">Drag & Drop files here, or click to browse</h3>
                     <p style="color: var(--admin-text-muted); font-size: 0.82rem; margin-bottom: 16px;">Supports JPG, PNG, WebP, GIF, SVG (Max file size: 5 MB)</p>
                     
-                    <input type="file" name="file" id="fileInput" accept="image/*" style="display: none;" onchange="this.form.submit()">
-                    <button type="button" class="btn-dark-pill" onclick="document.getElementById('fileInput').click()" style="display: inline-flex;">
+                    <input type="file" name="file" id="fileInput" accept="image/*" style="display: none;">
+                    <button type="button" class="btn-dark-pill btn-browse-file" style="display: inline-flex;">
                         <i class="fa-solid fa-folder-open"></i>
                         <span>Select File from Computer</span>
                     </button>
@@ -70,16 +70,16 @@
             <div style="padding: 20px;">
                 <div class="media-grid">
                     {% for item in media_items %}
-                        <div class="media-item" tabindex="0" onclick="this.classList.toggle('active-mobile')">
+                        <div class="media-item" tabindex="0">
                             <img src="{{ item.filepath }}" alt="{{ item.original_name }}" loading="lazy">
                             <div class="media-actions">
-                                <button type="button" class="btn-icon" title="Copy Media URL" onclick="event.stopPropagation(); copyMediaUrl('{{ item.filepath }}', this)">
+                                <button type="button" class="btn-icon btn-copy-media-url" data-url="{{ item.filepath }}" title="Copy Media URL">
                                     <i class="fa-solid fa-copy"></i>
                                 </button>
-                                <a href="{{ item.filepath }}" target="_blank" class="btn-icon" title="View Full Image" onclick="event.stopPropagation();">
+                                <a href="{{ item.filepath }}" target="_blank" class="btn-icon" title="View Full Image">
                                     <i class="fa-solid fa-arrow-up-right-from-square"></i>
                                 </a>
-                                <form method="POST" action="{{ url_for('admin.media_delete', media_id=item.id) }}" style="display:inline;" onsubmit="event.stopPropagation(); return confirm('Permanently delete this media file?');">
+                                <form method="POST" action="{{ url_for('admin.media_delete', media_id=item.id) }}" style="display:inline;" class="form-confirm-delete" data-confirm="Permanently delete this media file?">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="btn-icon danger" title="Delete File">
                                         <i class="fa-solid fa-trash-can"></i>
@@ -139,11 +139,40 @@
         });
     }
 
+    document.querySelectorAll('.btn-browse-file').forEach(btn => {
+        btn.addEventListener('click', () => document.getElementById('fileInput')?.click());
+    });
+    document.querySelectorAll('.btn-copy-media-url').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            copyMediaUrl(this.dataset.url, this);
+        });
+    });
+    document.querySelectorAll('.media-item').forEach(item => {
+        item.addEventListener('click', function() {
+            this.classList.toggle('active-mobile');
+        });
+    });
+    document.querySelectorAll('.form-confirm-delete').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.stopPropagation();
+            if (!confirm(this.dataset.confirm || 'Permanently delete this media file?')) {
+                e.preventDefault();
+            }
+        });
+    });
+
     // Drag and drop setup
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
 
     if (dropZone && fileInput) {
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) {
+                document.getElementById('mediaUploadForm').submit();
+            }
+        });
+
         ['dragenter', 'dragover'].forEach(eventName => {
             dropZone.addEventListener(eventName, (e) => {
                 e.preventDefault();

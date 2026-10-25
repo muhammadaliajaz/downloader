@@ -188,23 +188,23 @@
                 </div>
 
                 <div class="mobile-nav-list">
-                    <a href="#downloader" class="mobile-nav-item active" onclick="closeMobileMenu()">
+                    <a href="#downloader" class="mobile-nav-item active">
                         <i class="fa-solid fa-bolt"></i>
                         <span>Downloader Engine</span>
                     </a>
-                    <a href="#platforms" class="mobile-nav-item" onclick="closeMobileMenu()">
+                    <a href="#platforms" class="mobile-nav-item">
                         <i class="fa-solid fa-layer-group"></i>
                         <span>Supported Platforms</span>
                     </a>
-                    <a href="#how-to" class="mobile-nav-item" onclick="closeMobileMenu()">
+                    <a href="#how-to" class="mobile-nav-item">
                         <i class="fa-solid fa-circle-play"></i>
                         <span>How to Download</span>
                     </a>
-                    <a href="#features" class="mobile-nav-item" onclick="closeMobileMenu()">
+                    <a href="#features" class="mobile-nav-item">
                         <i class="fa-solid fa-star"></i>
                         <span>Platform Features</span>
                     </a>
-                    <a href="#faq" class="mobile-nav-item" onclick="closeMobileMenu()">
+                    <a href="#faq" class="mobile-nav-item">
                         <i class="fa-solid fa-circle-question"></i>
                         <span>Frequently Asked Questions</span>
                     </a>
@@ -223,7 +223,7 @@
                 </div>
 
                 <div class="mobile-nav-footer">
-                    <a href="#downloader" class="btn-mobile-cta" onclick="closeMobileMenu(); document.getElementById('videoUrl').focus();">
+                    <a href="#downloader" class="btn-mobile-cta" id="mobileCtaPasteBtn">
                         <i class="fa-solid fa-download"></i>
                         <span>Paste Video Link</span>
                     </a>
@@ -545,7 +545,7 @@
 
             <div class="platforms-spec-grid">
                 <!-- Card 1: YouTube -->
-                <div class="platform-spec-card" onclick="fillAndFocus('https://www.youtube.com/watch?v=dQw4w9WgXcQ', '720')">
+                <div class="platform-spec-card sample-link-card" data-sample-url="https://www.youtube.com/watch?v=dQw4w9WgXcQ" data-sample-quality="720">
                     <div>
                         <div class="platform-card-top">
                             <div class="platform-card-icon">
@@ -565,7 +565,7 @@
                 </div>
 
                 <!-- Card 2: ARY Plus & Zap -->
-                <div class="platform-spec-card" onclick="fillAndFocus('https://aryplus.tv/video/v2/3/6a89bcc6c0a797111795ce0a/6a57868b5bf57c474cc00a50', '720')">
+                <div class="platform-spec-card sample-link-card" data-sample-url="https://aryplus.tv/video/v2/3/6a89bcc6c0a797111795ce0a/6a57868b5bf57c474cc00a50" data-sample-quality="720">
                     <div>
                         <div class="platform-card-top">
                             <div class="platform-card-icon">
@@ -585,7 +585,7 @@
                 </div>
 
                 <!-- Card 3: Instagram -->
-                <div class="platform-spec-card" onclick="document.getElementById('videoUrl').focus()">
+                <div class="platform-spec-card focus-url-card">
                     <div>
                         <div class="platform-card-top">
                             <div class="platform-card-icon">
@@ -605,7 +605,7 @@
                 </div>
 
                 <!-- Card 4: TikTok -->
-                <div class="platform-spec-card" onclick="document.getElementById('videoUrl').focus()">
+                <div class="platform-spec-card focus-url-card">
                     <div>
                         <div class="platform-card-top">
                             <div class="platform-card-icon">
@@ -625,7 +625,7 @@
                 </div>
 
                 <!-- Card 5: Facebook -->
-                <div class="platform-spec-card" onclick="document.getElementById('videoUrl').focus()">
+                <div class="platform-spec-card focus-url-card">
                     <div>
                         <div class="platform-card-top">
                             <div class="platform-card-icon">
@@ -645,7 +645,7 @@
                 </div>
 
                 <!-- Card 6: X / Twitter -->
-                <div class="platform-spec-card" onclick="document.getElementById('videoUrl').focus()">
+                <div class="platform-spec-card focus-url-card">
                     <div>
                         <div class="platform-card-top">
                             <div class="platform-card-icon">
@@ -751,7 +751,7 @@
                     <span style="font-family: var(--font-mono); font-size: 0.8rem; font-weight: 700; color: var(--swatch-6); text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 4px;">Direct From Our CMS</span>
                     <h2 style="font-family: var(--font-display); font-size: 1.85rem; font-weight: 800; color: #ffffff; margin: 0;">Latest Guides &amp; Tech Articles</h2>
                 </div>
-                <a href="{{ url_for('blog.index') }}" style="color: var(--swatch-6); text-decoration: none; font-weight: 700; font-size: 0.88rem; display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; border-radius: 9999px; background: rgba(214, 237, 228, 0.08); border: 1px solid rgba(214, 237, 228, 0.2); transition: all 0.2s;" onmouseover="this.style.background='rgba(214, 237, 228, 0.16)'" onmouseout="this.style.background='rgba(214, 237, 228, 0.08)'">
+                <a href="{{ url_for('blog.index') }}" class="view-all-articles-link">
                     <span>View All Articles</span>
                     <i class="fa-solid fa-arrow-right" style="font-size: 12px;"></i>
                 </a>
@@ -762,7 +762,7 @@
                 <article style="background: rgba(16, 36, 33, 0.85); border: 1px solid rgba(214, 237, 228, 0.14); border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; transition: transform 0.2s, border-color 0.2s;">
                     {% if art.featured_image %}
                     <a href="{{ url_for('blog.post_detail', slug=art.slug) }}" style="display: block; width: 100%; aspect-ratio: 16/9; overflow: hidden; background: #0c1a17;">
-                        <img src="{{ art.featured_image }}" alt="{{ art.title }}" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s;" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'" loading="lazy">
+                        <img src="{{ art.featured_image }}" alt="{{ art.title }}" class="article-card-thumb" loading="lazy">
                     </a>
                     {% endif %}
                     <div style="padding: 22px; display: flex; flex-direction: column; flex: 1;">
@@ -1006,16 +1006,8 @@
                 successCard.style.display = 'none';
                 errorCard.style.display = 'block';
 
-                // DOM XSS Defense: Strip scripts, inline handlers, and javascript: links
-                if (typeof msg === 'string' && (msg.includes('<a') || msg.includes('<span') || msg.includes('<br>'))) {
-                    const cleanMsg = msg
-                        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-                        .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
-                        .replace(/javascript\s*:/gi, '');
-                    errorMessage.innerHTML = cleanMsg;
-                } else {
-                    errorMessage.textContent = msg || 'An unknown error occurred.';
-                }
+                // Strict DOM XSS Defense: Always assign untrusted server strings to textContent
+                errorMessage.textContent = (typeof msg === 'string' && msg.trim()) ? msg.trim() : 'An error occurred during video extraction.';
 
                 errorCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 submitBtn.disabled = false;
@@ -1084,6 +1076,47 @@
             window.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') closeMobileMenu();
             });
+
+            // Sample Platform Cards Click Handler
+            document.querySelectorAll('.sample-link-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const sampleUrl = card.getAttribute('data-sample-url');
+                    const sampleQuality = card.getAttribute('data-sample-quality');
+                    if (urlInput && sampleUrl) {
+                        urlInput.value = sampleUrl;
+                        if (qualitySelect && sampleQuality) qualitySelect.value = sampleQuality;
+                        urlInput.focus();
+                        urlInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                });
+            });
+
+            // Focus URL Card Handler
+            document.querySelectorAll('.focus-url-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    if (urlInput) {
+                        urlInput.focus();
+                        urlInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                });
+            });
+
+            // Mobile Navigation Drawer Links
+            document.querySelectorAll('.mobile-nav-item').forEach(link => {
+                link.addEventListener('click', closeMobileMenu);
+            });
+
+            // Mobile CTA Paste Button
+            const mobileCtaPasteBtn = document.getElementById('mobileCtaPasteBtn');
+            if (mobileCtaPasteBtn) {
+                mobileCtaPasteBtn.addEventListener('click', () => {
+                    closeMobileMenu();
+                    if (urlInput) {
+                        urlInput.focus();
+                        urlInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                });
+            }
         });
     </script>
 </body>

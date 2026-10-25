@@ -36,17 +36,17 @@
 
     <!-- Segmented Navigation Tab Bar -->
     <div class="cms-tabs-bar" id="accountTabsBar">
-        <button type="button" class="cms-tab-btn {% if active_tab == 'profile' %}active{% endif %}" onclick="switchAccountTab('profile')" data-tab="profile">
+        <button type="button" class="cms-tab-btn {% if active_tab == 'profile' %}active{% endif %}" data-tab="profile">
             <i class="fa-solid fa-id-card"></i>
             <span>Admin Profile</span>
         </button>
 
-        <button type="button" class="cms-tab-btn {% if active_tab == 'password' %}active{% endif %}" onclick="switchAccountTab('password')" data-tab="password">
+        <button type="button" class="cms-tab-btn {% if active_tab == 'password' %}active{% endif %}" data-tab="password">
             <i class="fa-solid fa-key"></i>
             <span>Password & Access</span>
         </button>
 
-        <button type="button" class="cms-tab-btn {% if active_tab == '2fa' %}active{% endif %}" onclick="switchAccountTab('2fa')" data-tab="2fa">
+        <button type="button" class="cms-tab-btn {% if active_tab == '2fa' %}active{% endif %}" data-tab="2fa">
             <i class="fa-solid fa-mobile-screen-button"></i>
             <span>Two-Factor (2FA)</span>
             {% if current_user.mfa_enabled %}
@@ -56,12 +56,12 @@
             {% endif %}
         </button>
 
-        <button type="button" class="cms-tab-btn {% if active_tab == 'recovery' %}active{% endif %}" onclick="switchAccountTab('recovery')" data-tab="recovery">
+        <button type="button" class="cms-tab-btn {% if active_tab == 'recovery' %}active{% endif %}" data-tab="recovery">
             <i class="fa-solid fa-database"></i>
             <span>Backup & Recovery</span>
         </button>
 
-        <button type="button" class="cms-tab-btn {% if active_tab == 'audit' %}active{% endif %}" onclick="switchAccountTab('audit')" data-tab="audit">
+        <button type="button" class="cms-tab-btn {% if active_tab == 'audit' %}active{% endif %}" data-tab="audit">
             <i class="fa-solid fa-clipboard-list"></i>
             <span>Audit Trail</span>
             <span class="badge-pill" style="background: rgba(0,0,0,0.06); color: var(--admin-text-main); font-size: 0.68rem; padding: 2px 7px;">{{ audit_logs|length }}</span>
@@ -211,11 +211,11 @@
 
                         <!-- Action Buttons: Download .txt and Copy All -->
                         <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px;">
-                            <button type="button" onclick="downloadBackupCodes()" class="btn-dark-pill" style="padding: 10px 22px; font-size: 0.88rem; font-weight: 700;">
+                            <button type="button" id="downloadBackupCodesBtn" class="btn-dark-pill" style="padding: 10px 22px; font-size: 0.88rem; font-weight: 700;">
                                 <i class="fa-solid fa-file-arrow-down" style="color: #a3e635 !important;"></i>
                                 <span style="color: #ffffff !important;">Download Codes (.txt)</span>
                             </button>
-                            <button type="button" onclick="copyAllBackupCodes()" class="btn-white-pill" style="padding: 10px 18px; font-size: 0.88rem; font-weight: 700; color: #111827 !important; border: 1.5px solid #d1d5db;">
+                            <button type="button" id="copyAllBackupCodesBtn" class="btn-white-pill" style="padding: 10px 18px; font-size: 0.88rem; font-weight: 700; color: #111827 !important; border: 1.5px solid #d1d5db;">
                                 <i class="fa-solid fa-copy" style="color: #059669;"></i>
                                 <span style="color: #111827 !important;">Copy All Codes</span>
                             </button>
@@ -244,7 +244,7 @@
                                         Tap <strong>+</strong> and scan the QR code on the left, or enter the key manually:
                                         <div style="display: flex; align-items: center; gap: 8px; margin: 8px 0;">
                                             <code id="setup-key-val" style="color: #065f46; background: #ffffff; border: 1px solid #10b981; font-family: monospace; font-size: 1.05rem; font-weight: 800; padding: 5px 12px; border-radius: 8px; letter-spacing: 1.5px; user-select: all; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">{{ setup_2fa_secret }}</code>
-                                            <button type="button" onclick="navigator.clipboard.writeText('{{ setup_2fa_secret }}'); alert('Secret key copied to clipboard!');" class="btn-white-pill" style="padding: 5px 12px; font-size: 0.78rem; font-weight: 700; color: #111827 !important; border: 1px solid #d1d5db;">
+                                            <button type="button" class="btn-copy-val btn-white-pill" data-copy="{{ setup_2fa_secret }}" style="padding: 5px 12px; font-size: 0.78rem; font-weight: 700; color: #111827 !important; border: 1px solid #d1d5db;">
                                                 <i class="fa-solid fa-copy"></i> Copy Key
                                             </button>
                                         </div>
@@ -301,7 +301,7 @@
                                 Disabling 2FA reduces account security. You will only need your username and password to log in.
                             </p>
 
-                            <form method="POST" action="{{ url_for('admin.account', tab='2fa') }}" onsubmit="return confirm('Are you sure you want to disable 2FA? This will lower your account security.');" style="max-width: 480px;">
+                            <form method="POST" action="{{ url_for('admin.account', tab='2fa') }}" class="confirm-action-form" data-confirm-msg="Are you sure you want to disable 2FA? This will lower your account security." style="max-width: 480px;">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="hidden" name="action" value="disable_2fa">
 
@@ -363,7 +363,7 @@
                     </p>
                     <div style="display: flex; align-items: center; gap: 12px; background: #ffffff; padding: 12px 18px; border-radius: 10px; border: 1.5px solid #f97316; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);">
                         <span id="recovery-key-text" style="font-family: monospace; font-size: 1.25rem; font-weight: 800; color: #9a3412; letter-spacing: 2px; user-select: all;">{{ generated_recovery_key }}</span>
-                        <button type="button" onclick="navigator.clipboard.writeText('{{ generated_recovery_key }}'); alert('Recovery key copied to clipboard!');" class="btn-white-pill" style="margin-left: auto; padding: 6px 14px; font-size: 0.82rem; font-weight: 700; color: #111827 !important; border: 1px solid #d1d5db;">
+                        <button type="button" class="btn-copy-val btn-white-pill" data-copy="{{ generated_recovery_key }}" style="margin-left: auto; padding: 6px 14px; font-size: 0.82rem; font-weight: 700; color: #111827 !important; border: 1px solid #d1d5db;">
                             <i class="fa-solid fa-copy"></i> Copy Key
                         </button>
                     </div>
@@ -554,6 +554,25 @@
         if (targetTab && document.getElementById('panel-' + targetTab)) {
             switchAccountTab(targetTab);
         }
+
+        const downloadBtn = document.getElementById('downloadBackupCodesBtn');
+        if (downloadBtn) downloadBtn.addEventListener('click', downloadBackupCodes);
+
+        const copyCodesBtn = document.getElementById('copyAllBackupCodesBtn');
+        if (copyCodesBtn) copyCodesBtn.addEventListener('click', copyAllBackupCodes);
+
+        document.querySelectorAll('.btn-copy-val').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const val = this.getAttribute('data-copy');
+                if (val) {
+                    navigator.clipboard.writeText(val).then(() => {
+                        alert('Copied to clipboard!');
+                    }).catch(() => {
+                        prompt('Copy value:', val);
+                    });
+                }
+            });
+        });
     });
 
     function getGeneratedBackupCodes() {

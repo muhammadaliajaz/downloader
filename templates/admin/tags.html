@@ -97,7 +97,7 @@
                                                     <i class="fa-solid fa-arrow-up-right-from-square"></i>
                                                 </a>
 
-                                                <form method="POST" action="{{ url_for('admin.tag_delete', tag_id=tag.id) }}" style="display:inline;" onsubmit="return confirm('Delete this tag? Articles with this tag will not be deleted.');">
+                                                <form method="POST" action="{{ url_for('admin.tag_delete', tag_id=tag.id) }}" style="display:inline;" class="confirm-action-form" data-confirm-msg="Delete this tag? Articles with this tag will not be deleted.">
                                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                     <button type="submit" class="btn-icon danger" title="Delete Tag">
                                                         <i class="fa-solid fa-trash-can"></i>

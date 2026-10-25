@@ -19,7 +19,7 @@
         </div>
 
         <div class="cms-actions-group">
-            <button type="button" class="btn-dark-pill" onclick="document.getElementById('settingsForm').submit()">
+            <button type="button" id="saveSettingsBtn" class="btn-dark-pill">
                 <i class="fa-solid fa-floppy-disk" style="color: #a3e635 !important;"></i>
                 <span style="color: #ffffff !important;">Save Settings</span>
             </button>
@@ -33,17 +33,17 @@
 
     <!-- Segmented Navigation Tab Bar -->
     <div class="cms-tabs-bar" id="settingsTabsBar">
-        <button type="button" class="cms-tab-btn active" onclick="switchSettingsTab('branding')" data-tab="branding">
+        <button type="button" class="cms-tab-btn active" data-tab="branding">
             <i class="fa-solid fa-sliders"></i>
             <span>Platform Branding</span>
         </button>
 
-        <button type="button" class="cms-tab-btn" onclick="switchSettingsTab('blog')" data-tab="blog">
+        <button type="button" class="cms-tab-btn" data-tab="blog">
             <i class="fa-solid fa-newspaper"></i>
             <span>Blog Preferences</span>
         </button>
 
-        <button type="button" class="cms-tab-btn" onclick="switchSettingsTab('social')" data-tab="social">
+        <button type="button" class="cms-tab-btn" data-tab="social">
             <i class="fa-solid fa-share-nodes"></i>
             <span>Social Media Channels</span>
         </button>
@@ -198,6 +198,14 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
+        const saveBtn = document.getElementById('saveSettingsBtn');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', function() {
+                const form = document.getElementById('settingsForm');
+                if (form) form.submit();
+            });
+        }
+
         document.querySelectorAll('#settingsTabsBar .cms-tab-btn').forEach(btn => {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();

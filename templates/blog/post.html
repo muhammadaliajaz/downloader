@@ -116,7 +116,7 @@
                     <i class="fa-brands fa-facebook"></i>
                 </a>
                 <!-- Copy Link -->
-                <button type="button" onclick="copyArticleLink(this)" class="share-btn" title="Copy Link">
+                <button type="button" id="copyArticleLinkBtn" class="share-btn" title="Copy Link">
                     <i class="fa-solid fa-link"></i>
                 </button>
             </div>
@@ -162,19 +162,27 @@
 
 </div>
 
-<script>
-    function copyArticleLink(btn) {
-        navigator.clipboard.writeText(window.location.href).then(() => {
-            const icon = btn.querySelector('i');
-            icon.className = 'fa-solid fa-check';
-            icon.style.color = '#34d399';
-            setTimeout(() => {
-                icon.className = 'fa-solid fa-link';
-                icon.style.color = '';
-            }, 2000);
-        }).catch(() => {
-            prompt('Copy Article Link:', window.location.href);
-        });
-    }
+<script nonce="{{ csp_nonce }}">
+    document.addEventListener('DOMContentLoaded', function() {
+        const copyBtn = document.getElementById('copyArticleLinkBtn');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', function() {
+                const btn = this;
+                navigator.clipboard.writeText(window.location.href).then(() => {
+                    const icon = btn.querySelector('i');
+                    if (icon) {
+                        icon.className = 'fa-solid fa-check';
+                        icon.style.color = '#34d399';
+                        setTimeout(() => {
+                            icon.className = 'fa-solid fa-link';
+                            icon.style.color = '';
+                        }, 2000);
+                    }
+                }).catch(() => {
+                    prompt('Copy Article Link:', window.location.href);
+                });
+            });
+        }
+    });
 </script>
 {% endblock %}

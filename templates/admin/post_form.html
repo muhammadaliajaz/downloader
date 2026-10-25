@@ -81,7 +81,7 @@
         </div>
 
         <div class="cms-actions-group">
-            <button type="button" class="btn-dark-pill" onclick="triggerMainSubmit()">
+            <button type="button" class="btn-dark-pill btn-trigger-submit">
                 <i class="fa-solid fa-floppy-disk"></i>
                 <span id="sheetSubmitText">{{ 'Review and publish' if not is_edit else 'Update & Publish' }}</span>
                 <i class="fa-solid fa-chevron-down" style="font-size: 11px; opacity: 0.8;"></i>
@@ -95,7 +95,7 @@
             {% endif %}
 
             {% if is_edit and post.id %}
-                <button type="button" class="btn-white-pill" style="color: #dc2626 !important; border-color: #fca5a5; background: #fff5f5; font-weight: 700;" onclick="confirmDeleteCurrentPost()">
+                <button type="button" class="btn-white-pill btn-delete-post" style="color: #dc2626 !important; border-color: #fca5a5; background: #fff5f5; font-weight: 700;">
                     <i class="fa-solid fa-trash-can" style="color: #dc2626 !important;"></i>
                     <span>Delete Article</span>
                 </button>
@@ -190,7 +190,7 @@
                         </div>
 
                         <div class="seo-drawer">
-                            <div class="seo-drawer-header" onclick="toggleSeoDrawer()">
+                            <div class="seo-drawer-header" id="seoDrawerToggle">
                                 <div style="display: flex; align-items: center; gap: 8px;">
                                     <i class="fa-solid fa-globe" style="color: var(--admin-primary);"></i>
                                     <span>Search Metadata (Meta Title, Description, Canonical)</span>
@@ -256,7 +256,7 @@
 
                         <div class="form-group" style="margin-bottom: 16px;">
                             <label class="form-label">Status</label>
-                            <select id="postStatusSelect" name="status" class="form-select" onchange="handleStatusChange()">
+                            <select id="postStatusSelect" name="status" class="form-select">
                                 <option value="draft" {% if post.status == 'draft' or not post.status %}selected{% endif %}>Draft (Unpublished)</option>
                                 <option value="published" {% if post.status == 'published' %}selected{% endif %}>Published (Live now)</option>
                                 <option value="scheduled" {% if post.status == 'scheduled' %}selected{% endif %}>Scheduled (Publish later)</option>
@@ -322,16 +322,16 @@
                             <label class="btn-secondary" style="flex: 1; justify-content: center; font-size: 0.85rem; cursor: pointer;">
                                 <i class="fa-solid fa-upload"></i>
                                 <span>Upload</span>
-                                <input type="file" id="directFeaturedUpload" accept="image/*" style="display: none;" onchange="uploadDirectFeatured(this)">
+                                <input type="file" id="directFeaturedUpload" accept="image/*" style="display: none;">
                             </label>
 
-                            <button type="button" class="btn-secondary" style="flex: 1; justify-content: center; font-size: 0.85rem;" onclick="openMediaModal()">
+                            <button type="button" class="btn-secondary" id="openMediaModalBtn" style="flex: 1; justify-content: center; font-size: 0.85rem;">
                                 <i class="fa-solid fa-folder-open"></i>
                                 <span>Library</span>
                             </button>
                         </div>
 
-                        <button type="button" class="btn-secondary danger {% if not post.featured_image %}d-none{% endif %}" id="removeImgBtn" style="width: 100%; justify-content: center; font-size: 0.8rem;" onclick="removeFeaturedImage()">
+                        <button type="button" class="btn-secondary danger {% if not post.featured_image %}d-none{% endif %}" id="removeImgBtn" style="width: 100%; justify-content: center; font-size: 0.8rem;">
                             <i class="fa-solid fa-trash-can"></i>
                             <span>Remove Featured Image</span>
                         </button>
@@ -354,7 +354,7 @@
                                 <label class="form-label" style="margin: 0;">Category</label>
                                 <a href="{{ url_for('admin.categories') }}" target="_blank" style="font-size: 0.75rem; color: var(--admin-primary); font-weight: 700; text-decoration: none;">+ Manage</a>
                             </div>
-                            <select name="category_id" class="form-select" onchange="updateCategoryPill(this)">
+                            <select name="category_id" class="form-select">
                                 <option value="">-- Select Category --</option>
                                 {% for cat in categories %}
                                     <option value="{{ cat.id }}" {% if post.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
@@ -379,7 +379,7 @@
                             <p style="font-size: 0.8rem; color: var(--admin-text-muted); margin-bottom: 14px; line-height: 1.45;">
                                 Once deleted, this article and its public URL will be permanently removed. This action cannot be reversed.
                             </p>
-                            <button type="button" onclick="confirmDeleteCurrentPost()" class="btn-secondary danger" style="width: 100%; justify-content: center; padding: 10px; font-weight: 700; color: #dc2626 !important; background: #fee2e2; border-color: #fca5a5;">
+                            <button type="button" class="btn-secondary danger btn-delete-post" style="width: 100%; justify-content: center; padding: 10px; font-weight: 700; color: #dc2626 !important; background: #fee2e2; border-color: #fca5a5;">
                                 <i class="fa-solid fa-trash-can"></i>
                                 <span>Permanently Delete Article</span>
                             </button>
@@ -409,7 +409,7 @@
     <div class="media-modal-box">
         <div style="padding: 16px 20px; border-bottom: 1px solid var(--admin-border-light); display: flex; align-items: center; justify-content: space-between;">
             <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--admin-text-main);"><i class="fa-solid fa-photo-film" style="color: var(--admin-primary);"></i> Select Image from Media Library</h3>
-            <button type="button" onclick="closeMediaModal()" class="btn-icon" style="border: none; background: none; font-size: 16px; cursor: pointer;">
+            <button type="button" id="closeMediaModalBtn" class="btn-icon" style="border: none; background: none; font-size: 16px; cursor: pointer;">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
@@ -418,7 +418,7 @@
             {% if all_media %}
                 <div class="media-grid" style="grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));">
                     {% for item in all_media %}
-                        <div class="media-item" onclick="selectMediaImage('{{ item.filepath }}')" style="cursor: pointer;" title="{{ item.original_name }}">
+                        <div class="media-item media-picker-select" data-media-url="{{ item.filepath }}" style="cursor: pointer;" title="{{ item.original_name }}">
                             <img src="{{ item.filepath }}" alt="{{ item.original_name }}">
                             <div class="media-actions" style="opacity: 0.9; background: rgba(17, 24, 39, 0.75);">
                                 <span style="font-size: 0.75rem; color: #fff; font-weight: 700;"><i class="fa-solid fa-check"></i> Choose</span>
@@ -718,6 +718,21 @@
     // Sync Quill HTML to hidden input before form submit
     document.getElementById('postForm').addEventListener('submit', function() {
         document.getElementById('hiddenContent').value = quill.root.innerHTML;
+    });
+
+    // Unobtrusive Event Listeners for CSP Compliance
+    document.querySelectorAll('.btn-trigger-submit').forEach(btn => btn.addEventListener('click', triggerMainSubmit));
+    document.querySelectorAll('.btn-delete-post').forEach(btn => btn.addEventListener('click', confirmDeleteCurrentPost));
+    document.getElementById('postStatusSelect')?.addEventListener('change', handleStatusChange);
+    document.getElementById('directFeaturedUpload')?.addEventListener('change', function() { uploadDirectFeatured(this); });
+    document.getElementById('seoDrawerToggle')?.addEventListener('click', toggleSeoDrawer);
+    document.getElementById('openMediaModalBtn')?.addEventListener('click', openMediaModal);
+    document.getElementById('closeMediaModalBtn')?.addEventListener('click', closeMediaModal);
+    document.getElementById('removeImgBtn')?.addEventListener('click', removeFeaturedImage);
+    document.querySelectorAll('.media-picker-select').forEach(item => {
+        item.addEventListener('click', function() {
+            selectMediaImage(this.dataset.mediaUrl);
+        });
     });
 </script>
 {% endblock %}

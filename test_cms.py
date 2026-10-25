@@ -659,6 +659,29 @@ class TestSecureAdminAndCMS(unittest.TestCase):
             with self.assertRaises(socket.error):
                 socket.create_connection(('169.254.169.254', 80))
 
+        # 1b. SSRF Concurrency Isolation: Interleaved concurrent threads cannot disable or race each other's guards
+        import threading
+        concurrency_errors = []
+        def worker(is_guarded, thread_id):
+            try:
+                for _ in range(5):
+                    if is_guarded:
+                        with ssrf_safe_socket():
+                            try:
+                                socket.create_connection(('127.0.0.1', 80))
+                                concurrency_errors.append(f"Thread {thread_id} failed to block SSRF inside guard!")
+                            except socket.error as e:
+                                if "SSRF Guard" not in str(e):
+                                    concurrency_errors.append(f"Unexpected error in thread {thread_id}: {e}")
+                    time.sleep(0.005)
+            except Exception as ex:
+                concurrency_errors.append(f"Thread {thread_id} crashed: {ex}")
+
+        threads = [threading.Thread(target=worker, args=(i % 2 == 0, i)) for i in range(10)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+        self.assertEqual(concurrency_errors, [], f"SSRF concurrency race detected: {concurrency_errors}")
+
         # 2. Proxy Header Spoofing Defense: Untrusted proxy cannot bypass HTTPS redirect by injecting X-Forwarded-Proto
         untrusted_spoof_res = self.client.get('/', headers={
             'Host': 'www.aryplusdownloader.tech',
@@ -690,11 +713,14 @@ class TestSecureAdminAndCMS(unittest.TestCase):
         with SSE_STREAM_LOCK:
             ACTIVE_SSE_BY_IP['127.0.0.1'] = 0
 
-        # 5. CSP Nonce in HTTP Header and Template HTML
+        # 5. CSP Nonce in HTTP Header and Template HTML & Hardened script-src
         home_res = self.client.get('/')
         csp_header = home_res.headers.get('Content-Security-Policy', '')
         self.assertIn("nonce-", csp_header)
         self.assertIn('nonce="', home_res.data.decode('utf-8'))
+        script_src = [part for part in csp_header.split(';') if 'script-src' in part][0]
+        self.assertNotIn("'unsafe-inline'", script_src)
+        self.assertNotIn("'unsafe-eval'", script_src)
 
         # 6. Anti-Indexing X-Robots-Tag Header & Meta Tag
         login_res = self.client.get('/admin/login')
@@ -714,12 +740,13 @@ class TestSecureAdminAndCMS(unittest.TestCase):
         from core.auth import hash_password
 
         conn = get_db_connection()
+        conn.execute("DELETE FROM articles WHERE title = ?", ('Article With Featured Image',))
         user = conn.execute("SELECT * FROM users WHERE username = 'superadmin'").fetchone()
         if not user:
             conn.execute("INSERT INTO users (username, display_name, password_hash, email, role) VALUES (?, ?, ?, ?, ?)",
                          ('superadmin', 'Senior Editor', hash_password('ComplexPassword123!'), 'admin@stellar.tech', 'admin'))
-            conn.commit()
-            user = conn.execute("SELECT * FROM users WHERE username = 'superadmin'").fetchone()
+        conn.commit()
+        user = conn.execute("SELECT * FROM users WHERE username = 'superadmin'").fetchone()
         conn.close()
 
         # 1. Login as admin
