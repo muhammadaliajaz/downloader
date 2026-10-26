@@ -117,22 +117,25 @@ def validate_url(url):
 
     try:
         parsed = urllib.parse.urlparse(url)
+        if not parsed.scheme or parsed.scheme.lower() not in ['http', 'https']:
+            return False, "Only HTTP and HTTPS URLs are permitted"
+
+        # Accessing hostname or port on malformed URLs (e.g. invalid port characters or out of range)
+        # raises ValueError in urllib.parse. Catching ValueError here prevents uncaught 500 crashes.
+        hostname = parsed.hostname
+        if not hostname:
+            return False, "Invalid URL hostname"
+
+        hostname = hostname.lower().strip()
+
+        # Port restriction: Block non-standard or dangerous services
+        port = parsed.port
+        if port is not None and port not in ALLOWED_PORTS:
+            return False, f"Target port {port} is prohibited. Only standard web ports (80, 443, 8080, 8443) are allowed."
+    except (ValueError, TypeError) as e:
+        return False, f"Malformed URL port or structure: {str(e)}"
     except Exception:
         return False, "Invalid URL structure"
-
-    if parsed.scheme.lower() not in ['http', 'https']:
-        return False, "Only HTTP and HTTPS URLs are permitted"
-
-    hostname = parsed.hostname
-    if not hostname:
-        return False, "Invalid URL hostname"
-
-    hostname = hostname.lower().strip()
-
-    # Port restriction: Block non-standard or dangerous services
-    port = parsed.port
-    if port is not None and port not in ALLOWED_PORTS:
-        return False, f"Target port {port} is prohibited. Only standard web ports (80, 443, 8080, 8443) are allowed."
 
     # Block local loopback and internal hostname patterns
     blocked_hosts = ['localhost', 'loopback', 'local', 'internal', 'intranet', 'instance-data', 'metadata', 'localdomain', 'onion']
@@ -168,16 +171,17 @@ def validate_url(url):
 def is_safe_filepath(file_path, base_directory):
     """
     Prevents Path Traversal attacks by confirming that target file path 
-    is strictly located within the designated downloads directory.
+    is strictly located within the designated base directory.
+    Canonicalizes paths, resolves symlinks, and rejects base directory itself.
     """
-    if not file_path or not os.path.isabs(file_path):
+    if not file_path or not base_directory:
         return False
-    
-    target_abs = os.path.abspath(file_path)
-    base_abs = os.path.abspath(base_directory)
-    
-    # Common prefix check with separator to prevent path prefix matching attacks
-    return os.path.commonpath([target_abs, base_abs]) == base_abs
+    try:
+        target_abs = os.path.realpath(os.path.abspath(file_path))
+        base_abs = os.path.realpath(os.path.abspath(base_directory))
+        return os.path.commonpath([target_abs, base_abs]) == base_abs and target_abs != base_abs
+    except Exception:
+        return False
 
 # ============================================================================
 # Thread-Isolated SSRF Protection with DNS Rebinding Defense (IP Pinning)

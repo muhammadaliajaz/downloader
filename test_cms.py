@@ -810,5 +810,50 @@ class TestSecureAdminAndCMS(unittest.TestCase):
             self.assertIsNone(updated_post['featured_image'])
             conn.close()
 
+    def test_16_uploads_path_traversal_and_malformed_ports(self):
+        """
+        Verify:
+        1. /static/uploads/ blocks path traversal attacks (%2e%2e%2f, ../../, etc.) and returns 404.
+        2. /static/uploads/ refuses to serve non-image files (.py, .env, .db, .txt).
+        3. URLs with malformed ports return 400 (not 500) and are safely rejected by validate_url.
+        """
+        from core.security import validate_url
+
+        # 1. Path traversal attacks on static uploads
+        traversal_attempts = [
+            '/static/uploads/%2e%2e%2f%2e%2e%2fapp.py',
+            '/static/uploads/../../app.py',
+            '/static/uploads/%2e%2e%2f%2e%2e%2f%2e%2e%2f.env',
+            '/static/uploads/..%2f..%2fapp.py',
+            '/static/uploads/%2e%2e%2fcore/db.py',
+            '/static/uploads/%2e%2e%2fProcfile',
+            '/static/uploads/%2e%2e%2frequirements.txt',
+        ]
+        for path in traversal_attempts:
+            res = self.client.get(path)
+            self.assertEqual(res.status_code, 404, f"Path traversal succeeded on {path} with status {res.status_code}")
+            # Ensure Python source code or env content is NEVER returned
+            self.assertNotIn(b'Flask(__name__)', res.data)
+            self.assertNotIn(b'SECRET_KEY', res.data)
+
+        # 2. Malformed port handling in validate_url and /api/download
+        malformed_urls = [
+            "http://example.com:abc",
+            "http://example.com:999999",
+            "http://example.com:-1",
+            "http://example.com:0",
+            "http://[::1]:999999",
+            "https://example.com:invalidport/video",
+        ]
+        for m_url in malformed_urls:
+            valid, err = validate_url(m_url)
+            self.assertFalse(valid, f"Malformed port URL was marked valid: {m_url}")
+
+            # Must return 400 Bad Request, NEVER 500 Internal Server Error
+            api_res = self.client.post('/api/download', json={'url': m_url, 'format': 'mp4', 'quality': '720'})
+            self.assertEqual(api_res.status_code, 400, f"Malformed URL {m_url} returned status {api_res.status_code}")
+            self.assertIn('error', api_res.get_json())
+
 if __name__ == '__main__':
     unittest.main()
+

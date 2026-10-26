@@ -7,8 +7,10 @@ import threading
 import urllib.parse
 import ipaddress
 import secrets
+import re
 from flask import Flask, render_template, request, jsonify, Response, send_file, redirect, url_for, session, g, abort
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.utils import safe_join
 
 from core.downloader import start_download_thread, get_progress, cancel_download
 from core.cleanup import start_cleanup_scheduler
@@ -329,46 +331,86 @@ def index():
     conn.close()
     return render_template('index.html', recent_articles=recent_articles)
 
+ALLOWED_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'ico'}
+ALLOWED_MIMETYPES = {
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'webp': 'image/webp',
+    'gif': 'image/gif',
+    'svg': 'image/svg+xml',
+    'ico': 'image/x-icon'
+}
+
 @app.route('/static/uploads/<path:filename>')
 def serve_optimized_upload(filename):
     """
-    High-performance image handler: serves on-the-fly WebP optimized variants
-    for large legacy uploads (>120KB), reducing main page payloads by up to 95%.
+    High-performance and strictly secure image handler:
+    1. Enforces strict containment checking via safe_join and is_safe_filepath to block path traversal.
+    2. Serves ONLY permitted image extensions (strictly rejects source code, env, config, db files).
+    3. Serves on-the-fly WebP optimized variants for large legacy uploads (>120KB).
     """
-    file_path = os.path.join(UPLOADS_DIR, filename)
-    if not os.path.isfile(file_path):
+    if not filename or '\0' in filename:
         abort(404)
 
-    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
-    if ext not in ['jpg', 'jpeg', 'png', 'webp']:
-        return send_file(file_path)
+    # 1. Containment-checked path resolver (strictly blocks path traversal)
+    safe_path = safe_join(UPLOADS_DIR, filename)
+    if not safe_path:
+        abort(404)
+
+    resolved_path = os.path.realpath(os.path.abspath(safe_path))
+    uploads_canonical = os.path.realpath(os.path.abspath(UPLOADS_DIR))
+
+    if not is_safe_filepath(resolved_path, uploads_canonical):
+        abort(404)
+
+    if not os.path.isfile(resolved_path):
+        abort(404)
+
+    # 2. Strict Whitelist: Serve ONLY permitted image formats
+    ext = resolved_path.rsplit('.', 1)[-1].lower() if '.' in resolved_path else ''
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        abort(404)
+
+    mimetype = ALLOWED_MIMETYPES.get(ext, 'application/octet-stream')
 
     try:
-        file_size = os.path.getsize(file_path)
+        file_size = os.path.getsize(resolved_path)
     except Exception:
         file_size = 0
 
-    if file_size <= 120 * 1024:
-        res = send_file(file_path)
+    # For SVGs, GIFs, ICOs, or images <= 120KB, serve directly with strict headers
+    if ext not in ['jpg', 'jpeg', 'png'] or file_size <= 120 * 1024:
+        res = send_file(resolved_path, mimetype=mimetype)
         res.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        res.headers['X-Content-Type-Options'] = 'nosniff'
         return res
 
     accept = request.headers.get('Accept', '').lower()
     can_webp = 'image/webp' in accept or '*/*' in accept or not accept
 
-    opt_dir = os.path.join(UPLOADS_DIR, '_opt')
+    opt_dir = os.path.join(uploads_canonical, '_opt')
     os.makedirs(opt_dir, exist_ok=True)
-    base_name = os.path.splitext(filename)[0]
-    opt_file = os.path.join(opt_dir, f"{base_name}.webp")
+    base_name = os.path.basename(resolved_path).rsplit('.', 1)[0]
+    clean_base = re.sub(r'[^a-zA-Z0-9_\-]', '', base_name) or 'optimized_image'
+    opt_file = os.path.join(opt_dir, f"{clean_base}.webp")
+
+    # Verify opt_file containment
+    if not is_safe_filepath(opt_file, uploads_canonical):
+        res = send_file(resolved_path, mimetype=mimetype)
+        res.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        res.headers['X-Content-Type-Options'] = 'nosniff'
+        return res
 
     if os.path.isfile(opt_file):
         res = send_file(opt_file, mimetype='image/webp')
         res.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        res.headers['X-Content-Type-Options'] = 'nosniff'
         return res
 
     try:
         from PIL import Image
-        with Image.open(file_path) as img:
+        with Image.open(resolved_path) as img:
             max_dim = 1200
             if img.width > max_dim or img.height > max_dim:
                 img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
@@ -379,10 +421,12 @@ def serve_optimized_upload(filename):
                 img.save(opt_file, 'WEBP' if can_webp else 'JPEG', quality=80, optimize=True)
         res = send_file(opt_file, mimetype='image/webp' if can_webp else 'image/jpeg')
         res.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        res.headers['X-Content-Type-Options'] = 'nosniff'
         return res
     except Exception:
-        res = send_file(file_path)
+        res = send_file(resolved_path, mimetype=mimetype)
         res.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        res.headers['X-Content-Type-Options'] = 'nosniff'
         return res
 
 @app.route('/preview')
