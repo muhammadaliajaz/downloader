@@ -1,5 +1,6 @@
 import urllib.parse
 import ipaddress
+import errno
 import os
 import time
 import threading
@@ -189,8 +190,84 @@ def is_safe_filepath(file_path, base_directory):
 
 _SSRF_TLS = threading.local()
 _ORIGINAL_CREATE_CONNECTION = socket.create_connection
+_ORIGINAL_SOCKET_CONNECT = socket.socket.connect
+_ORIGINAL_SOCKET_CONNECT_EX = socket.socket.connect_ex
 _HOOK_LOCK = threading.Lock()
 _HOOK_INSTALLED = False
+
+def _validate_socket_destination(sock, address):
+    """Validate the actual address passed to a socket connect call.
+
+    HTTP libraries may bypass ``socket.create_connection`` and call
+    ``socket.socket.connect`` directly (notably while following redirects).
+    Checking the resolved sockaddr at this layer closes that gap.
+    """
+    if not getattr(_SSRF_TLS, 'active', False):
+        return address
+
+    if sock.family not in (socket.AF_INET, socket.AF_INET6):
+        raise socket.error("SSRF Guard: Non-IP socket destinations are prohibited")
+
+    if not isinstance(address, tuple) or len(address) < 2:
+        raise socket.error("SSRF Guard: Invalid socket destination")
+
+    host, port = address[0], address[1]
+    try:
+        ip = ipaddress.ip_address(host.split('%', 1)[0] if isinstance(host, str) else host)
+    except ValueError:
+        # Some callers pass a hostname directly to socket.connect. Resolve it
+        # once, reject mixed public/private answers, then pin to the sockaddr.
+        try:
+            addrs = socket.getaddrinfo(host, port, sock.family, socket.SOCK_STREAM)
+        except OSError as exc:
+            raise socket.error(f"SSRF Guard: Domain resolution failed: {exc}")
+
+        if not addrs:
+            raise socket.error("SSRF Guard: Domain could not be resolved")
+
+        safe_sockaddrs = []
+        for af, _socktype, _proto, _canonname, sockaddr in addrs:
+            resolved_ip = ipaddress.ip_address(sockaddr[0].split('%', 1)[0])
+            if is_prohibited_ip(resolved_ip):
+                raise socket.error(f"SSRF Guard: Prohibited resolved IP destination {resolved_ip}")
+            if af == sock.family:
+                safe_sockaddrs.append(sockaddr)
+
+        if not safe_sockaddrs:
+            raise socket.error("SSRF Guard: No compatible safe address was resolved")
+        return safe_sockaddrs[0]
+
+    if is_prohibited_ip(ip):
+        raise socket.error(f"SSRF Guard: Prohibited IP destination {ip}")
+    return address
+
+def _safe_socket_connect(sock, address):
+    return _ORIGINAL_SOCKET_CONNECT(sock, _validate_socket_destination(sock, address))
+
+def _safe_socket_connect_ex(sock, address):
+    try:
+        address = _validate_socket_destination(sock, address)
+    except OSError as exc:
+        return exc.errno or errno.EACCES
+    return _ORIGINAL_SOCKET_CONNECT_EX(sock, address)
+
+def _safe_thread_start(self, *args, **kwargs):
+    """
+    Ensures that any worker threads spawned by yt-dlp, ThreadPoolExecutor, or HTTP transports
+    automatically inherit the SSRF security context of their parent thread.
+    """
+    if getattr(_SSRF_TLS, 'active', False):
+        orig_run = self.run
+        def guarded_run(*r_args, **r_kwargs):
+            _SSRF_TLS.active = True
+            try:
+                return orig_run(*r_args, **r_kwargs)
+            finally:
+                _SSRF_TLS.active = False
+        self.run = guarded_run
+    return _ORIGINAL_THREAD_START(self, *args, **kwargs)
+
+_ORIGINAL_THREAD_START = threading.Thread.start
 
 def _safe_create_connection(address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None, **kwargs):
     """
@@ -260,6 +337,59 @@ def _install_ssrf_socket_hook():
     with _HOOK_LOCK:
         if not _HOOK_INSTALLED:
             socket.create_connection = _safe_create_connection
+            socket.socket.connect = _safe_socket_connect
+            socket.socket.connect_ex = _safe_socket_connect_ex
+            threading.Thread.start = _safe_thread_start
+
+            # 1. urllib3 connection hook (used by requests and yt-dlp)
+            try:
+                import urllib3.util.connection as u3_conn
+                orig_u3_create = u3_conn.create_connection
+                def _safe_u3_create(address, *args, **kwargs):
+                    if getattr(_SSRF_TLS, 'active', False):
+                        host = address[0]
+                        try:
+                            ip = ipaddress.ip_address(host.split('%', 1)[0] if isinstance(host, str) else host)
+                            if is_prohibited_ip(ip):
+                                raise socket.error(f"SSRF Guard: Prohibited IP destination {ip}")
+                        except ValueError:
+                            pass
+                    return orig_u3_create(address, *args, **kwargs)
+                u3_conn.create_connection = _safe_u3_create
+            except (ImportError, AttributeError):
+                pass
+
+            # 2. requests redirect hook (stops redirects at HTTP protocol layer)
+            try:
+                import requests.sessions
+                orig_res_redir = requests.sessions.Session.resolve_redirects
+                def _safe_resolve_redirects(self, resp, req, *args, **kwargs):
+                    for r in orig_res_redir(self, resp, req, *args, **kwargs):
+                        if getattr(_SSRF_TLS, 'active', False):
+                            t_url = getattr(r, 'url', None)
+                            if t_url:
+                                valid, err = validate_url(t_url)
+                                if not valid:
+                                    raise requests.exceptions.InvalidURL(f"SSRF Guard: Blocked redirect to prohibited destination: {err}")
+                        yield r
+                requests.sessions.Session.resolve_redirects = _safe_resolve_redirects
+            except (ImportError, AttributeError):
+                pass
+
+            # 3. urllib.request redirect hook
+            try:
+                import urllib.request
+                orig_urllib_redir = urllib.request.HTTPRedirectHandler.redirect_request
+                def _safe_urllib_redirect(self, req, fp, code, msg, headers, newurl):
+                    if getattr(_SSRF_TLS, 'active', False):
+                        valid, err = validate_url(newurl)
+                        if not valid:
+                            raise urllib.error.HTTPError(newurl, 400, f"SSRF Guard: Blocked redirect to prohibited destination: {err}", headers, fp)
+                    return orig_urllib_redir(self, req, fp, code, msg, headers, newurl)
+                urllib.request.HTTPRedirectHandler.redirect_request = _safe_urllib_redirect
+            except (ImportError, AttributeError):
+                pass
+
             _HOOK_INSTALLED = True
 
 # Install hook permanently at module load time
@@ -268,10 +398,11 @@ _install_ssrf_socket_hook()
 @contextmanager
 def ssrf_safe_socket():
     """
-    Context manager that activates thread-isolated SSRF protection for the current thread.
+    Context manager that activates thread-isolated SSRF protection for the current thread and child workers.
     - Completely eliminates concurrency races (each thread has its own isolated flag).
     - Prevents DNS rebinding by pinning outbound sockets directly to verified IP addresses.
     - Preserves TLS SNI and HTTP Host headers for full HTTPS/CDN compatibility.
+    - Proactively blocks redirect bypasses at both socket and HTTP layers.
     """
     _install_ssrf_socket_hook()
     prev_state = getattr(_SSRF_TLS, 'active', False)

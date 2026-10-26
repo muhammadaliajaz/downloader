@@ -570,6 +570,10 @@ def download_task(task_id, url, format_type, quality, download_dir):
                 del CANCEL_EVENTS[task_id]
 
 def start_download_thread(task_id, url, format_type, quality, download_dir):
-    thread = threading.Thread(target=download_task, args=(task_id, url, format_type, quality, download_dir))
+    def _guarded_worker():
+        with ssrf_safe_socket():
+            download_task(task_id, url, format_type, quality, download_dir)
+
+    thread = threading.Thread(target=_guarded_worker)
     thread.daemon = True
     thread.start()

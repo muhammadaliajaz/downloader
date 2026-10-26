@@ -1,5 +1,6 @@
 import unittest
 import os
+import errno
 
 # Isolate unit tests to a dedicated local test database
 TEST_DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), 'data', 'test_cms.db'))
@@ -658,6 +659,41 @@ class TestSecureAdminAndCMS(unittest.TestCase):
                 socket.create_connection(('127.0.0.1', 80))
             with self.assertRaises(socket.error):
                 socket.create_connection(('169.254.169.254', 80))
+
+            # HTTP transports may bypass create_connection and call socket.connect
+            # directly when following redirects. Guard the actual socket call too.
+            guarded_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                with self.assertRaisesRegex(socket.error, 'SSRF Guard'):
+                    guarded_sock.connect(('127.0.0.1', 1))
+            finally:
+                guarded_sock.close()
+
+            guarded_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                self.assertEqual(guarded_sock.connect_ex(('127.0.0.1', 1)), errno.EACCES)
+            finally:
+                guarded_sock.close()
+
+            # Exercise urllib3's lower-level connection path used by redirect handling.
+            import urllib3.util.connection as urllib3_connection
+            with self.assertRaisesRegex(socket.error, 'SSRF Guard'):
+                urllib3_connection.create_connection(('127.0.0.1', 1), timeout=0.2)
+
+            # Exercise ThreadPoolExecutor thread-inheritance (used by yt-dlp concurrent fragments)
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                def worker_check():
+                    guarded_s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    try:
+                        guarded_s.connect(('127.0.0.1', 1))
+                        return False
+                    except socket.error as e:
+                        return "SSRF Guard" in str(e)
+                    finally:
+                        guarded_s.close()
+                fut = executor.submit(worker_check)
+                self.assertTrue(fut.result(), "Worker thread in ThreadPoolExecutor did not inherit SSRF guard!")
 
         # 1b. SSRF Concurrency Isolation: Interleaved concurrent threads cannot disable or race each other's guards
         import threading
