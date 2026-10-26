@@ -54,7 +54,7 @@ def verify_totp_code(secret_b32: str, code_input: str, interval: int = 30, windo
             return True
     return False
 
-def generate_qr_code_data_uri(secret_b32: str, username: str = "", issuer: str = "StellarStudio") -> str:
+def generate_qr_code_data_uri(secret_b32: str, username: str = "", issuer: str = "ARYPlusDownloader") -> str:
     """Generates an embedded PNG Base64 data URI of the Authenticator QR code."""
     # Defensive guard: if arguments were accidentally swapped (e.g. username first, secret second)
     if len(username) > len(secret_b32) and all(c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567=' for c in username.upper()):

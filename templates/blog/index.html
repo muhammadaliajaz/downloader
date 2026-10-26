@@ -2,9 +2,9 @@
 
 {% block title %}
     {% if search_query %}
-        Search Results for "{{ search_query }}" | Stellar Blog
+        Search Results for "{{ search_query }}" | ARY Plus Blog
     {% elif selected_category %}
-        {{ selected_category|replace('-', ' ')|title }} Articles | Stellar Blog
+        {{ selected_category|replace('-', ' ')|title }} Articles | ARY Plus Blog
     {% else %}
         {{ site_settings.site_title }} | Tech Guides, Video Tutorials & Insights
     {% endif %}

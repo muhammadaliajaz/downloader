@@ -95,7 +95,7 @@ def blog_index():
         featured_post = articles[0]
 
     site_settings = {
-        'site_title': get_setting('site_title', 'Stellar Video Downloader & Blog'),
+        'site_title': get_setting('site_title', 'ARY PLUS DOWNLOADER'),
         'site_tagline': get_setting('site_tagline', 'Free Video Downloader & Tech Insights'),
         'site_description': get_setting('site_description', 'High-quality guides, tech tips, and streaming insights.'),
         'canonical_url': request.base_url
@@ -195,7 +195,7 @@ def article_detail(slug):
             related_articles.append(rel)
 
     site_settings = {
-        'site_title': get_setting('site_title', 'Stellar Video Downloader & Blog'),
+        'site_title': get_setting('site_title', 'ARY PLUS DOWNLOADER'),
         'site_url': get_setting('site_url', 'https://www.aryplusdownloader.tech'),
     }
 

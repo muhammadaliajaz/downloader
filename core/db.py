@@ -35,13 +35,13 @@ TABLES_WITH_ID = {'users', 'categories', 'tags', 'articles', 'media', 'audit_log
 
 # Platform Master Default Settings
 DEFAULT_SETTINGS = {
-    'site_title': 'Stellar Video Downloader & Tech Blog',
-    'site_tagline': 'Free 4K Video Downloader, Audio Extractor & Entertainment Hub',
+    'site_title': 'ARY PLUS DOWNLOADER',
+    'site_tagline': 'Free HD Video & Audio Downloader',
     'site_url': 'https://www.aryplusdownloader.tech',
-    'site_description': 'Download HD videos from ARY Plus, YouTube, TikTok, Facebook, and Instagram. Read latest tech guides, drama updates, and media tips.',
+    'site_description': 'Download HD videos and MP3 audio from ARY Plus, YouTube, TikTok, Facebook, and Instagram for free. Fast, high-speed, and no registration required.',
     'contact_email': 'support@aryplusdownloader.tech',
     'posts_per_page': '9',
-    'footer_copyright': '© 2026 Stellar Studio. All rights reserved.',
+    'footer_copyright': '© 2026 ARY PLUS DOWNLOADER. All rights reserved.',
     'twitter_url': 'https://twitter.com',
     'youtube_url': 'https://youtube.com',
     'facebook_url': 'https://facebook.com',
@@ -488,7 +488,7 @@ def _init_postgres_db(conn):
             cur.execute('''
                 INSERT INTO users (username, display_name, email, password_hash, role, security_stamp, recovery_key_hash)
                 VALUES (?, ?, ?, ?, 'admin', ?, ?)
-            ''', (env_user, env_user, os.environ.get('ADMIN_EMAIL', f'{env_user}@stellar.tech'), hash_password(env_pwd), secrets.token_hex(16), rec_hash))
+            ''', (env_user, env_user, os.environ.get('ADMIN_EMAIL', f'{env_user}@aryplusdownloader.tech'), hash_password(env_pwd), secrets.token_hex(16), rec_hash))
 
     conn.commit()
     conn.close()
@@ -650,7 +650,7 @@ def _init_sqlite_db(conn):
             cursor.execute('''
                 INSERT INTO users (username, display_name, email, password_hash, role, security_stamp, recovery_key_hash)
                 VALUES (?, ?, ?, ?, 'admin', ?, ?)
-            ''', (env_user, env_user, os.environ.get('ADMIN_EMAIL', f'{env_user}@stellar.tech'), hash_password(env_pwd), secrets.token_hex(16), rec_hash))
+            ''', (env_user, env_user, os.environ.get('ADMIN_EMAIL', f'{env_user}@aryplusdownloader.tech'), hash_password(env_pwd), secrets.token_hex(16), rec_hash))
 
     conn.commit()
     conn.close()
@@ -734,6 +734,21 @@ def get_all_settings():
         for k, v in DEFAULT_SETTINGS.items():
             if k not in settings_dict or not settings_dict[k]:
                 settings_dict[k] = v
+
+        # Normalize duplicate titles & replace legacy defaults
+        st = (settings_dict.get('site_title') or '').strip()
+        tg = (settings_dict.get('site_tagline') or '').strip()
+
+        if not st or st in ('Stellar Video Downloader', 'Stellar Video Downloader & Blog', 'Stellar Studio'):
+            settings_dict['site_title'] = 'ARY PLUS DOWNLOADER'
+            st = 'ARY PLUS DOWNLOADER'
+
+        if not tg or tg.lower() == st.lower() or tg in ('Stellar Video Downloader', 'Stellar Studio', 'Free Video Downloader & Tech Insights'):
+            settings_dict['site_tagline'] = 'Free HD Video & Audio Downloader'
+
+        if settings_dict.get('footer_copyright') in ('© 2026 Stellar Studio. All rights reserved.', '© 2026 Stellar Video Downloader. All rights reserved.'):
+            settings_dict['footer_copyright'] = '© 2026 ARY PLUS DOWNLOADER. All rights reserved.'
+
         _SETTINGS_CACHE = settings_dict
         _SETTINGS_CACHE_TIME = now
         return dict(settings_dict)

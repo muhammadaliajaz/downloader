@@ -343,7 +343,7 @@ def database_backup():
     
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     log_audit_event('DB_BACKUP_DOWNLOADED', f"Full database backup downloaded by '{session.get('username')}'", user_id=session.get('user_id'), username=session.get('username'), ip_address=request.remote_addr)
-    return send_file(DB_PATH, as_attachment=True, download_name=f"stellar_cms_backup_{timestamp}.db")
+    return send_file(DB_PATH, as_attachment=True, download_name=f"ary_plus_cms_backup_{timestamp}.db")
 
 # -------------------------------------------------------------
 # 2. DASHBOARD OVERVIEW
@@ -1094,7 +1094,7 @@ def account():
             # Reuse existing pending secret or generate fresh one
             temp_secret = session.get('pending_2fa_secret') or generate_base32_secret()
             session['pending_2fa_secret'] = temp_secret
-            qr_uri = generate_qr_code_data_uri(secret_b32=temp_secret, username=current_usr['username'], issuer="StellarStudio")
+            qr_uri = generate_qr_code_data_uri(secret_b32=temp_secret, username=current_usr['username'], issuer="ARYPlusDownloader")
             audit_logs = conn.execute("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 30").fetchall()
             conn.close()
             return render_template(
@@ -1114,7 +1114,7 @@ def account():
             if not secret or not code or not verify_totp_code(secret, code, window=6):
                 log_audit_event('2FA_ACTIVATION_FAILED', f"Code verification failed for user '{current_usr['username']}'. Input: '{code}'. Server time: {datetime.now().strftime('%H:%M:%S')}", user_id=current_usr['id'], username=current_usr['username'], ip_address=request.remote_addr)
                 flash('Invalid 6-digit code. Please verify the code displayed in your authenticator app and try again. (Tip: Ensure your phone clock is set to Automatic Network Time).', 'error')
-                qr_uri = generate_qr_code_data_uri(secret_b32=secret, username=current_usr['username'], issuer="StellarStudio")
+                qr_uri = generate_qr_code_data_uri(secret_b32=secret, username=current_usr['username'], issuer="ARYPlusDownloader")
                 audit_logs = conn.execute("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 30").fetchall()
                 conn.close()
                 return render_template(

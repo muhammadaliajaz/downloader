@@ -125,6 +125,8 @@ def inject_globals():
 
 DOWNLOADS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'downloads'))
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
+UPLOADS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), 'static', 'uploads'))
+os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 # Start background cleanup scheduler for temporary files (every 10 minutes)
 start_cleanup_scheduler(DOWNLOADS_DIR)
@@ -279,6 +281,20 @@ def apply_security_headers(response):
         request.path.startswith('/api/')):
         response.headers['X-Robots-Tag'] = 'noindex, nofollow, noarchive, nosnippet'
 
+    # Dynamic Gzip Compression for text-based responses (HTML, CSS, JS, JSON)
+    accept_encoding = request.headers.get('Accept-Encoding', '').lower()
+    if 'gzip' in accept_encoding and response.status_code == 200 and not response.direct_passthrough:
+        c_type = response.headers.get('Content-Type', '').lower()
+        if any(t in c_type for t in ['text/html', 'text/css', 'application/javascript', 'application/json', 'text/plain']):
+            import gzip
+            data = response.get_data()
+            if len(data) > 500:
+                compressed = gzip.compress(data, compresslevel=6)
+                if len(compressed) < len(data):
+                    response.set_data(compressed)
+                    response.headers['Content-Encoding'] = 'gzip'
+                    response.headers['Content-Length'] = len(compressed)
+
     # Mask server header banner to prevent software fingerprinting
     response.headers['Server'] = 'Protected'
     return response
@@ -313,6 +329,62 @@ def index():
     conn.close()
     return render_template('index.html', recent_articles=recent_articles)
 
+@app.route('/static/uploads/<path:filename>')
+def serve_optimized_upload(filename):
+    """
+    High-performance image handler: serves on-the-fly WebP optimized variants
+    for large legacy uploads (>120KB), reducing main page payloads by up to 95%.
+    """
+    file_path = os.path.join(UPLOADS_DIR, filename)
+    if not os.path.isfile(file_path):
+        abort(404)
+
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+    if ext not in ['jpg', 'jpeg', 'png', 'webp']:
+        return send_file(file_path)
+
+    try:
+        file_size = os.path.getsize(file_path)
+    except Exception:
+        file_size = 0
+
+    if file_size <= 120 * 1024:
+        res = send_file(file_path)
+        res.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        return res
+
+    accept = request.headers.get('Accept', '').lower()
+    can_webp = 'image/webp' in accept or '*/*' in accept or not accept
+
+    opt_dir = os.path.join(UPLOADS_DIR, '_opt')
+    os.makedirs(opt_dir, exist_ok=True)
+    base_name = os.path.splitext(filename)[0]
+    opt_file = os.path.join(opt_dir, f"{base_name}.webp")
+
+    if os.path.isfile(opt_file):
+        res = send_file(opt_file, mimetype='image/webp')
+        res.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        return res
+
+    try:
+        from PIL import Image
+        with Image.open(file_path) as img:
+            max_dim = 1200
+            if img.width > max_dim or img.height > max_dim:
+                img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+            if img.mode in ('RGBA', 'LA') and can_webp:
+                img.save(opt_file, 'WEBP', quality=80)
+            else:
+                img = img.convert('RGB')
+                img.save(opt_file, 'WEBP' if can_webp else 'JPEG', quality=80, optimize=True)
+        res = send_file(opt_file, mimetype='image/webp' if can_webp else 'image/jpeg')
+        res.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        return res
+    except Exception:
+        res = send_file(file_path)
+        res.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        return res
+
 @app.route('/preview')
 def preview_ui():
     return redirect(url_for('index'))
@@ -322,7 +394,7 @@ def health_check():
     """Sanitized public health endpoint for deployment probes and load balancers."""
     return jsonify({
         'status': 'healthy',
-        'service': 'Stellar Engine'
+        'service': 'ARY Plus Engine'
     })
 
 @app.route('/api/debug_ytdlp')

@@ -8,25 +8,33 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <!-- SEO Primary Meta Tags -->
-    <title>{{ settings.site_title }} | {{ settings.site_tagline }}</title>
-    <meta name="title" content="{{ settings.site_title }} | {{ settings.site_tagline }}">
+    {% set clean_title = settings.site_title or 'ARY PLUS DOWNLOADER' %}
+    {% set clean_tagline = settings.site_tagline or 'Free HD Video & Audio Downloader' %}
+    {% if clean_title|lower == clean_tagline|lower or 'ary plus downloader' in clean_tagline|lower %}
+        {% set seo_page_title = clean_title ~ ' - Free HD Video & Audio Downloader' %}
+    {% else %}
+        {% set seo_page_title = clean_title ~ ' - ' ~ clean_tagline %}
+    {% endif %}
+
+    <title>{{ seo_page_title }}</title>
+    <meta name="title" content="{{ seo_page_title }}">
     <meta name="description" content="{{ settings.site_description }}">
-    <meta name="keywords" content="video downloader, youtube downloader, tiktok downloader, instagram downloader, facebook video downloader, mp3 converter, link extractor, 4k video download, ary plus drama download">
-    <meta name="author" content="{{ settings.site_title }}">
+    <meta name="keywords" content="ary plus downloader, video downloader, youtube downloader, tiktok downloader, instagram downloader, facebook video downloader, mp3 converter, link extractor, 4k video download, ary drama download">
+    <meta name="author" content="{{ clean_title }}">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="{{ settings.site_url }}/">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ settings.site_url }}/">
-    <meta property="og:title" content="{{ settings.site_title }} | {{ settings.site_tagline }}">
+    <meta property="og:title" content="{{ seo_page_title }}">
     <meta property="og:description" content="{{ settings.site_description }}">
-    <meta property="og:site_name" content="{{ settings.site_title }}">
+    <meta property="og:site_name" content="{{ clean_title }}">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="{{ settings.site_url }}/">
-    <meta property="twitter:title" content="{{ settings.site_title }} | {{ settings.site_tagline }}">
+    <meta property="twitter:title" content="{{ seo_page_title }}">
     <meta property="twitter:description" content="{{ settings.site_description }}">
 
     <!-- Favicon -->
@@ -39,8 +47,8 @@
       {
         "@context": "https://schema.org",
         "@type": "WebApplication",
-        "name": "Stellar Video Downloader",
-        "url": "https://yourdomain.com",
+        "name": "ARY Plus Video Downloader",
+        "url": "{{ settings.site_url }}",
         "description": "High-quality video and audio link extractor for ARY Plus, YouTube, TikTok, Instagram, and social media platforms.",
         "applicationCategory": "MultimediaApplication",
         "operatingSystem": "All",
@@ -53,7 +61,7 @@
       {
         "@context": "https://schema.org",
         "@type": "HowTo",
-        "name": "How to Download Videos with Stellar Studio",
+        "name": "How to Download Videos with ARY Plus Downloader",
         "step": [
           {
             "@type": "HowToStep",
@@ -63,7 +71,7 @@
           {
             "@type": "HowToStep",
             "name": "Paste Link",
-            "text": "Paste the link into the Stellar Downloader search box and select your preferred format (MP4 or MP3)."
+            "text": "Paste the link into the ARY Plus Downloader search box and select your preferred format (MP4 or MP3)."
           },
           {
             "@type": "HowToStep",
@@ -78,15 +86,15 @@
         "mainEntity": [
           {
             "@type": "Question",
-            "name": "What is Stellar Video Downloader?",
+            "name": "What is ARY Plus Video Downloader?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Stellar Studio provides a state-of-the-art link extraction engine that downloads high-definition videos from ARY Plus, YouTube, Facebook, Instagram, and TikTok with zero registration."
+              "text": "ARY Plus Downloader provides a state-of-the-art link extraction engine that downloads high-definition videos from ARY Plus, YouTube, Facebook, Instagram, and TikTok with zero registration."
             }
           },
           {
             "@type": "Question",
-            "name": "Is Stellar Studio safe and free?",
+            "name": "Is ARY Plus Downloader safe and free?",
             "acceptedAnswer": {
               "@type": "Answer",
               "text": "Yes, 100% free and secure. No accounts, software installations, or intrusive permissions are required."
@@ -398,9 +406,9 @@
                 <span class="promo-tag-outline">Free</span>
                 <span class="promo-badge-pill">Universal</span>
             </div>
-            <h2 class="promo-main-heading">Stellar Video Downloader</h2>
+            <h2 class="promo-main-heading">ARY Plus Video Downloader</h2>
             <p class="promo-subtext">
-                With Stellar Studio, you can easily download any Pakistani drama episode, YouTube video, or social media
+                With ARY Plus Downloader, you can easily download any Pakistani drama episode, YouTube video, or social media
                 link with zero friction.
             </p>
             <a href="#how-to" class="btn-learn-more">
@@ -414,7 +422,7 @@
             <div class="section-header-centered">
                 <span class="section-label-light">How to use</span>
                 <h2 class="section-title-large">
-                    <span class="highlight">Stellar</span> Downloader
+                    <span class="highlight">ARY Plus</span> Downloader
                 </h2>
             </div>
 
@@ -422,8 +430,12 @@
                 <!-- Left: Cutout character graphic on shaped container (Photo 1) -->
                 <div class="character-showcase-box">
                     <div class="character-backdrop-blob"></div>
-                    <img src="{{ url_for('static', filename='img/how_to_portrait.jpg') }}"
-                        alt="Smiling user holding smartphone" class="character-img-cutout" />
+                    <picture>
+                        <source srcset="{{ url_for('static', filename='img/how_to_portrait.webp') }}" type="image/webp">
+                        <img src="{{ url_for('static', filename='img/how_to_portrait.jpg') }}"
+                            alt="Smiling user holding smartphone" class="character-img-cutout"
+                            width="260" height="340" loading="lazy" />
+                    </picture>
                 </div>
 
                 <!-- Right: Circular Numbered Steps (Photo 1) -->
@@ -465,7 +477,7 @@
         <section class="horizontal-cards-grid">
             <div class="dark-step-card">
                 <span class="card-huge-number">01</span>
-                <p>With Stellar Studio, you can easily download any video from ARY Plus, YouTube, TikTok, and Instagram
+                <p>With ARY Plus Downloader, you can easily download any video from ARY Plus, YouTube, TikTok, and Instagram
                     completely free of charge.</p>
             </div>
 
@@ -487,7 +499,7 @@
             <div class="section-header-centered">
                 <span class="section-label-light">Why To Choose</span>
                 <h2 class="section-title-large">
-                    <span class="highlight">Stellar Studio</span> Downloader
+                    <span class="highlight">ARY Plus</span> Downloader
                 </h2>
             </div>
 
@@ -685,12 +697,12 @@
                     <!-- Item 1 -->
                     <div class="faq-row active">
                         <button type="button" class="faq-trigger-btn">
-                            <span>01. What Is Stellar Video Downloader?</span>
+                            <span>01. What Is ARY Plus Video Downloader?</span>
                             <i class="fa-solid fa-chevron-down faq-chevron"></i>
                         </button>
                         <div class="faq-answer-panel">
                             <div class="faq-answer-inner">
-                                <p>Stellar Studio provides a high-speed web utility that allows you to download videos
+                                <p>ARY Plus Downloader provides a high-speed web utility that allows you to download videos
                                     and audio from ARY Plus, ARY Zap, YouTube, Instagram, Facebook, and TikTok directly
                                     to your storage without installing third-party apps or software.</p>
                             </div>
@@ -700,7 +712,7 @@
                     <!-- Item 2 -->
                     <div class="faq-row">
                         <button type="button" class="faq-trigger-btn">
-                            <span>02. Is Stellar Studio Safe To Use?</span>
+                            <span>02. Is ARY Plus Downloader Safe To Use?</span>
                             <i class="fa-solid fa-chevron-down faq-chevron"></i>
                         </button>
                         <div class="faq-answer-panel">
@@ -762,7 +774,7 @@
                 <article style="background: rgba(16, 36, 33, 0.85); border: 1px solid rgba(214, 237, 228, 0.14); border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; transition: transform 0.2s, border-color 0.2s;">
                     {% if art.featured_image %}
                     <a href="{{ url_for('blog.post_detail', slug=art.slug) }}" style="display: block; width: 100%; aspect-ratio: 16/9; overflow: hidden; background: #0c1a17;">
-                        <img src="{{ art.featured_image }}" alt="{{ art.title }}" class="article-card-thumb" loading="lazy">
+                        <img src="{{ art.featured_image }}" alt="{{ art.title }}" class="article-card-thumb" loading="lazy" width="380" height="214" decoding="async" style="width: 100%; height: 100%; object-fit: cover;">
                     </a>
                     {% endif %}
                     <div style="padding: 22px; display: flex; flex-direction: column; flex: 1;">

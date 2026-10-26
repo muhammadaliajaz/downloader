@@ -101,6 +101,7 @@ def save_media_file(file_storage):
     unique_name = f"{safe_base}_{uuid.uuid4().hex[:10]}.{ext}"
     target_path = os.path.join(UPLOAD_FOLDER, unique_name)
 
+    final_size = size
     try:
         if ext == 'svg':
             file_storage.seek(0)
@@ -108,8 +109,31 @@ def save_media_file(file_storage):
             cleaned = sanitize_svg_content(raw)
             with open(target_path, 'wb') as f:
                 f.write(cleaned)
+            final_size = len(cleaned)
         else:
-            file_storage.save(target_path)
+            try:
+                from PIL import Image
+                file_storage.seek(0)
+                img = Image.open(file_storage)
+                max_dim = 1200
+                if img.width > max_dim or img.height > max_dim:
+                    img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+                
+                if ext in ['jpg', 'jpeg']:
+                    if img.mode in ('RGBA', 'LA', 'P'):
+                        img = img.convert('RGB')
+                    img.save(target_path, 'JPEG', quality=82, optimize=True)
+                elif ext == 'webp':
+                    img.save(target_path, 'WEBP', quality=82)
+                elif ext == 'png':
+                    img.save(target_path, 'PNG', optimize=True)
+                else:
+                    file_storage.seek(0)
+                    file_storage.save(target_path)
+            except Exception:
+                file_storage.seek(0)
+                file_storage.save(target_path)
+            final_size = os.path.getsize(target_path) if os.path.exists(target_path) else size
     except Exception as e:
         return False, f"Failed to save file: {str(e)}", None
 
@@ -123,7 +147,7 @@ def save_media_file(file_storage):
     cursor.execute('''
         INSERT INTO media (filename, original_name, filepath, file_size, mime_type)
         VALUES (?, ?, ?, ?, ?)
-    ''', (unique_name, orig_name, public_url, size, mime_type))
+    ''', (unique_name, orig_name, public_url, final_size, mime_type))
     conn.commit()
     media_id = cursor.lastrowid
     conn.close()
