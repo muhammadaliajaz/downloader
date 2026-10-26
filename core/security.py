@@ -195,6 +195,34 @@ _ORIGINAL_SOCKET_CONNECT_EX = socket.socket.connect_ex
 _HOOK_LOCK = threading.Lock()
 _HOOK_INSTALLED = False
 
+_DNS_CACHE = {}
+_DNS_CACHE_LOCK = threading.Lock()
+_DNS_CACHE_TTL = 300 # 5 minutes cache
+
+def _get_cached_addrinfo(host, port, family=socket.AF_UNSPEC):
+    """
+    High-performance in-memory DNS cache:
+    Eliminates blocking getaddrinfo roundtrips on repeated video fragment connections,
+    and sorts addresses to prioritize IPv4 (AF_INET) for maximum line-rate download speed.
+    """
+    now = time.time()
+    cache_key = (host, port, family)
+    with _DNS_CACHE_LOCK:
+        if cache_key in _DNS_CACHE:
+            ts, addrs = _DNS_CACHE[cache_key]
+            if now - ts < _DNS_CACHE_TTL:
+                return addrs
+
+    addrs = socket.getaddrinfo(host, port, family, socket.SOCK_STREAM)
+    # Sort addresses to prioritize IPv4 (AF_INET) to prevent IPv6 timeout penalties
+    addrs.sort(key=lambda x: 0 if x[0] == socket.AF_INET else 1)
+
+    with _DNS_CACHE_LOCK:
+        if len(_DNS_CACHE) > 500:
+            _DNS_CACHE.clear()
+        _DNS_CACHE[cache_key] = (now, addrs)
+    return addrs
+
 def _validate_socket_destination(sock, address):
     """Validate the actual address passed to a socket connect call.
 
@@ -218,7 +246,7 @@ def _validate_socket_destination(sock, address):
         # Some callers pass a hostname directly to socket.connect. Resolve it
         # once, reject mixed public/private answers, then pin to the sockaddr.
         try:
-            addrs = socket.getaddrinfo(host, port, sock.family, socket.SOCK_STREAM)
+            addrs = _get_cached_addrinfo(host, port, sock.family)
         except OSError as exc:
             raise socket.error(f"SSRF Guard: Domain resolution failed: {exc}")
 
@@ -296,7 +324,7 @@ def _safe_create_connection(address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, sou
 
     # 2. Hostname Resolution with DNS Rebinding Defense (IP Pinning)
     try:
-        addrs = socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        addrs = _get_cached_addrinfo(host, port, socket.AF_UNSPEC)
         if not addrs:
             raise socket.gaierror(f"SSRF Guard: Domain {host} could not be resolved")
 

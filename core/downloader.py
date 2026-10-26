@@ -228,6 +228,8 @@ def download_task(task_id, url, format_type, quality, download_dir):
         'noplaylist': True,
         'cachedir': False,
         'force_ipv4': True,
+        'buffersize': 1048576,        # 1 MB internal buffer for maximum socket throughput
+        'http_chunk_size': 10485760,   # 10 MB chunking to bypass YouTube speed throttling
         'retries': 5,
         'fragment_retries': 5,
         'skip_unavailable_fragments': True,
@@ -266,9 +268,9 @@ def download_task(task_id, url, format_type, quality, download_dir):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://www.tiktok.com/',
         }
-        ydl_opts['concurrent_fragments'] = 4
-    else:
         ydl_opts['concurrent_fragments'] = 6
+    else:
+        ydl_opts['concurrent_fragments'] = 8
     task_cookiefile = None
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
