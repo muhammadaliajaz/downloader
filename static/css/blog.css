@@ -977,6 +977,18 @@ body.blog-body {
   font-size: 12px;
 }
 
+.footer-copy a {
+  color: var(--swatch-6);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.2s ease;
+}
+
+.footer-copy a:hover {
+  color: #ffffff;
+}
+
 /* Flash alerts */
 .alert {
   padding: 12px 18px;
