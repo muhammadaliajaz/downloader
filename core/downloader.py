@@ -420,12 +420,12 @@ def download_task(task_id, url, format_type, quality, download_dir):
     # For YouTube:
     # Do not hardcode player_client when authenticated with cookies so yt-dlp can use its
     # full suite of cookie-compatible clients (web, web_embedded, mweb, tv)
-    if not has_cookies:
-        ydl_opts['extractor_args'] = {
-            'youtube': {
-                'player_client': ['visionos']
-            }
+    ydl_opts['extractor_args'] = {
+        'youtube': {
+            'player_skip': ['webpage'],
+            'player_client': ['tv', 'visionos', 'ios', 'android'] if not has_cookies else ['tv', 'visionos', 'ios', 'android', 'web']
         }
+    }
 
     if format_type == 'mp3':
         ydl_opts.update({
@@ -480,23 +480,28 @@ def download_task(task_id, url, format_type, quality, download_dir):
             fallback_strategies = [dict(ydl_opts)]
         else:
             fallback_strategies = [
-                # Tier 1: Primary smart extraction (with authenticated session)
+                # Tier 1: Primary TV + Mobile + VisionOS engine (skips blocked webpage)
                 dict(ydl_opts),
-                # Tier 2: Broad resilient format selector (preserves cookies)
+                # Tier 2: Resilient broad format selector
                 {
                     **ydl_opts,
-                    'format': 'best/bestvideo+bestaudio/18/b'
+                    'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best/18/b'
                 },
-                # Tier 3: Direct progressive format 18 (preserves cookies)
+                # Tier 3: Direct progressive format 18
                 {
                     **ydl_opts,
                     'format': '18/best/b'
                 },
-                # Tier 4: Pure anonymous Apple VisionOS engine (bypasses bot wall if cookies fail/expire)
+                # Tier 4: Direct mobile iOS/Android/VisionOS engine (skips webpage)
                 {
-                    **{k: v for k, v in ydl_opts.items() if k != 'cookiefile'},
-                    'format': 'best/bestvideo+bestaudio/b',
-                    'extractor_args': {'youtube': {'player_client': ['visionos']}}
+                    **ydl_opts,
+                    'format': 'best/18/b',
+                    'extractor_args': {
+                        'youtube': {
+                            'player_skip': ['webpage'],
+                            'player_client': ['ios', 'android', 'visionos']
+                        }
+                    }
                 }
             ]
         

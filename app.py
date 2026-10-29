@@ -714,7 +714,7 @@ def download_file(task_id):
 
     file_size = os.path.getsize(file_path)
     file_handle = open(file_path, 'rb')
-    wrapped_file = wrap_file(request.environ, file_handle, buffer_size=262144)
+    wrapped_file = wrap_file(request.environ, file_handle, buffer_size=1048576)
     response = Response(
         wrapped_file,
         mimetype=mimetype,
