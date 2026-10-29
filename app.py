@@ -126,9 +126,10 @@ def inject_globals():
         except Exception:
             pass
     all_settings = get_all_settings()
-    # Security: Strictly isolate authentication cookies so non-admin visitors can NEVER access them
+    # Security: Strictly isolate authentication cookies and operational secrets from non-admin visitors
+    SENSITIVE_SETTINGS = {'youtube_cookies', 'ary_api_key'}
     if not is_admin:
-        all_settings = {k: v for k, v in all_settings.items() if k != 'youtube_cookies'}
+        all_settings = {k: v for k, v in all_settings.items() if k not in SENSITIVE_SETTINGS}
     return {
         'csrf_token': generate_csrf_token,
         'current_user': user,
