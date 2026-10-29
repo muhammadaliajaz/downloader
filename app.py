@@ -364,6 +364,23 @@ def serve_optimized_upload(filename):
     if not is_safe_filepath(resolved_path, uploads_canonical):
         abort(404)
 
+    # Self-healing persistent storage: If file is missing on container disk (e.g. after restart),
+    # automatically restore it from Supabase / database media storage
+    if not os.path.isfile(resolved_path):
+        base_name = os.path.basename(resolved_path)
+        try:
+            conn = get_db_connection()
+            row = conn.execute("SELECT file_data, mime_type FROM media WHERE filename = ? LIMIT 1", (base_name,)).fetchone()
+            conn.close()
+            if row and row['file_data']:
+                import base64
+                raw_bytes = base64.b64decode(row['file_data'])
+                os.makedirs(os.path.dirname(resolved_path), exist_ok=True)
+                with open(resolved_path, 'wb') as f:
+                    f.write(raw_bytes)
+        except Exception as e:
+            print("Media self-healing recovery notice:", e)
+
     if not os.path.isfile(resolved_path):
         abort(404)
 
@@ -674,9 +691,9 @@ def download_file(task_id):
     _, ext = os.path.splitext(file_path)
     clean_download_name = f"{clean_title}{ext}"
 
-    # Background auto-delete after 3 minutes grace period to free disk space
+    # Background auto-delete after 1 hour grace period to free disk space (never delete active downloads)
     def secure_delete():
-        time.sleep(180)
+        time.sleep(3600)
         try:
             if os.path.isfile(file_path):
                 os.remove(file_path)
@@ -684,8 +701,76 @@ def download_file(task_id):
             pass
                 
     threading.Thread(target=secure_delete, daemon=True).start()
-    
-    return send_file(file_path, as_attachment=True, download_name=clean_download_name)
+
+    MEDIA_MIMETYPES = {
+        '.mp4': 'video/mp4',
+        '.mp3': 'audio/mpeg',
+        '.m4a': 'audio/mp4',
+        '.webm': 'video/webm',
+        '.mkv': 'video/x-matroska',
+        '.avi': 'video/x-msvideo',
+        '.mov': 'video/quicktime',
+        '.flv': 'video/x-flv'
+    }
+    mimetype = MEDIA_MIMETYPES.get(ext.lower(), 'application/octet-stream')
+
+    stat = os.stat(file_path)
+    file_size = stat.st_size
+    range_header = request.headers.get('Range', None)
+
+    start = 0
+    end = file_size - 1
+    status_code = 200
+
+    if range_header and range_header.startswith('bytes='):
+        try:
+            r_str = range_header.replace('bytes=', '').strip()
+            parts = r_str.split('-')
+            if parts[0]:
+                start = int(parts[0])
+            if len(parts) > 1 and parts[1]:
+                end = int(parts[1])
+            if 0 <= start <= end and start < file_size:
+                end = min(end, file_size - 1)
+                status_code = 206
+            else:
+                start = 0
+                end = file_size - 1
+        except Exception:
+            start = 0
+            end = file_size - 1
+
+    length = end - start + 1
+    CHUNK_SIZE = 1048576  # 1 MB chunks for maximum TCP window throughput
+
+    def stream_chunks():
+        with open(file_path, 'rb') as f:
+            if start > 0:
+                f.seek(start)
+            remaining = length
+            while remaining > 0:
+                chunk = f.read(min(CHUNK_SIZE, remaining))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+                yield chunk
+
+    # RFC 5987 / RFC 6266 filename encoding
+    from urllib.parse import quote
+    quoted_name = quote(clean_download_name, safe="!#$&+-.^_`|~")
+    ascii_name = clean_download_name.encode('ascii', 'ignore').decode('ascii') or 'video'
+
+    response = Response(stream_chunks(), status=status_code, mimetype=mimetype)
+    response.headers['Content-Disposition'] = f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quoted_name}'
+    response.headers['Content-Length'] = str(length)
+    response.headers['Accept-Ranges'] = 'bytes'
+    response.headers['Cache-Control'] = 'public, max-age=3600, no-transform'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+
+    if status_code == 206:
+        response.headers['Content-Range'] = f'bytes {start}-{end}/{file_size}'
+
+    return response
 
 if __name__ == '__main__':
     # Production security: debug mode disabled

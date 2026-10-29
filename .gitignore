@@ -50,6 +50,9 @@ data/*.db-shm
 !data/.gitkeep
 static/uploads/*
 !static/uploads/.gitkeep
+!static/uploads/ARY_Plus_Downloader_Article_Gr_eedb65bf61.webp
+!static/uploads/DMG9vOVYsPbR89QPFMxMDz1AxrMW9V_83307fc1fc.webp
+!static/uploads/online-downloader-safety-guide_6130bd3eef.webp
 
 # Environment Variables, Secrets & Cookies
 .env

@@ -141,13 +141,23 @@ def save_media_file(file_storage):
     mime_type = getattr(file_storage, 'mimetype', None) or f"image/{ext}"
     public_url = f"/static/uploads/{unique_name}"
 
+    # Persistent cloud storage: Read saved file bytes and encode to base64
+    file_b64 = None
+    try:
+        if os.path.isfile(target_path):
+            with open(target_path, 'rb') as f:
+                import base64
+                file_b64 = base64.b64encode(f.read()).decode('utf-8')
+    except Exception as e:
+        print("Media base64 encoding notice:", e)
+
     # Register in DB
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO media (filename, original_name, filepath, file_size, mime_type)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (unique_name, orig_name, public_url, final_size, mime_type))
+        INSERT INTO media (filename, original_name, filepath, file_size, mime_type, file_data)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (unique_name, orig_name, public_url, final_size, mime_type, file_b64))
     conn.commit()
     media_id = cursor.lastrowid
     conn.close()

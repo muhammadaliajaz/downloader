@@ -442,6 +442,7 @@ def _init_postgres_db(conn):
         filepath TEXT NOT NULL,
         file_size BIGINT NOT NULL,
         mime_type VARCHAR(100) NOT NULL,
+        file_data TEXT,
         uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -459,6 +460,10 @@ def _init_postgres_db(conn):
     CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);
     '''
     cur._cursor.execute(schema_sql)
+    try:
+        cur._cursor.execute("ALTER TABLE media ADD COLUMN IF NOT EXISTS file_data TEXT;")
+    except Exception:
+        pass
 
     # Seed Default Settings
     for k, v in DEFAULT_SETTINGS.items():
@@ -602,9 +607,14 @@ def _init_sqlite_db(conn):
             filepath TEXT NOT NULL,
             file_size INTEGER NOT NULL,
             mime_type TEXT NOT NULL,
+            file_data TEXT,
             uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     ''')
+    try:
+        cursor.execute("ALTER TABLE media ADD COLUMN file_data TEXT;")
+    except Exception:
+        pass
 
     # 8. Security & Admin Audit Logs Table
     cursor.execute('''
