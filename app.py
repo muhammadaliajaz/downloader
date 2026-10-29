@@ -490,7 +490,7 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'service': 'ARY Plus Engine',
-        'version': 'v7'
+        'version': 'v8'
     })
 
 @app.route('/api/debug_ytdlp')
