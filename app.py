@@ -714,62 +714,17 @@ def download_file(task_id):
     }
     mimetype = MEDIA_MIMETYPES.get(ext.lower(), 'application/octet-stream')
 
-    stat = os.stat(file_path)
-    file_size = stat.st_size
-    range_header = request.headers.get('Range', None)
-
-    start = 0
-    end = file_size - 1
-    status_code = 200
-
-    if range_header and range_header.startswith('bytes='):
-        try:
-            r_str = range_header.replace('bytes=', '').strip()
-            parts = r_str.split('-')
-            if parts[0]:
-                start = int(parts[0])
-            if len(parts) > 1 and parts[1]:
-                end = int(parts[1])
-            if 0 <= start <= end and start < file_size:
-                end = min(end, file_size - 1)
-                status_code = 206
-            else:
-                start = 0
-                end = file_size - 1
-        except Exception:
-            start = 0
-            end = file_size - 1
-
-    length = end - start + 1
-    CHUNK_SIZE = 1048576  # 1 MB chunks for maximum TCP window throughput
-
-    def stream_chunks():
-        with open(file_path, 'rb') as f:
-            if start > 0:
-                f.seek(start)
-            remaining = length
-            while remaining > 0:
-                chunk = f.read(min(CHUNK_SIZE, remaining))
-                if not chunk:
-                    break
-                remaining -= len(chunk)
-                yield chunk
-
-    # RFC 5987 / RFC 6266 filename encoding
-    from urllib.parse import quote
-    quoted_name = quote(clean_download_name, safe="!#$&+-.^_`|~")
-    ascii_name = clean_download_name.encode('ascii', 'ignore').decode('ascii') or 'video'
-
-    response = Response(stream_chunks(), status=status_code, mimetype=mimetype)
-    response.headers['Content-Disposition'] = f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quoted_name}'
-    response.headers['Content-Length'] = str(length)
+    response = send_file(
+        file_path,
+        as_attachment=True,
+        download_name=clean_download_name,
+        mimetype=mimetype,
+        conditional=True,
+        max_age=3600
+    )
     response.headers['Accept-Ranges'] = 'bytes'
     response.headers['Cache-Control'] = 'public, max-age=3600, no-transform'
     response.headers['X-Content-Type-Options'] = 'nosniff'
-
-    if status_code == 206:
-        response.headers['Content-Range'] = f'bytes {start}-{end}/{file_size}'
-
     return response
 
 if __name__ == '__main__':
