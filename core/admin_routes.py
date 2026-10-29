@@ -979,7 +979,8 @@ def settings():
         editable_keys = [
             'site_title', 'site_tagline', 'site_url', 'site_description',
             'contact_email', 'posts_per_page', 'footer_copyright',
-            'twitter_url', 'youtube_url', 'facebook_url', 'instagram_url'
+            'twitter_url', 'youtube_url', 'facebook_url', 'instagram_url',
+            'youtube_cookies'
         ]
 
         for k in editable_keys:

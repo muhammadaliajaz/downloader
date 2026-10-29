@@ -43,9 +43,14 @@
             <span>Blog Preferences</span>
         </button>
 
-        <button type="button" class="cms-tab-btn" data-tab="social">
+<button type="button" class="cms-tab-btn" data-tab="social">
             <i class="fa-solid fa-share-nodes"></i>
             <span>Social Media Channels</span>
+        </button>
+
+        <button type="button" class="cms-tab-btn" data-tab="youtube">
+            <i class="fa-brands fa-youtube" style="color: #ef4444;"></i>
+            <span>YouTube Engine & Cookies</span>
         </button>
     </div>
 
@@ -152,6 +157,36 @@
                             <label class="form-label" for="instagram_url"><i class="fa-brands fa-instagram"></i> Instagram Profile</label>
                             <input type="url" id="instagram_url" name="instagram_url" value="{{ settings.instagram_url or '' }}" placeholder="https://instagram.com/yourprofile" class="form-input">
                         </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-dark-pill" style="padding: 13px 32px; font-size: 0.95rem; font-weight: 700;">
+                    <i class="fa-solid fa-floppy-disk" style="color: #a3e635 !important;"></i>
+                    <span style="color: #ffffff !important;">Save Website Settings</span>
+                </button>
+            </div>
+
+            <!-- TAB 4: YouTube Engine & Cookies -->
+            <div id="panel-youtube" class="cms-tab-panel">
+                <div class="form-card" style="margin-bottom: 28px;">
+                    <div class="form-card-title">
+                        <i class="fa-brands fa-youtube" style="color: #ef4444;"></i>
+                        <span>YouTube Cloud Extractor Authentication</span>
+                    </div>
+
+                    <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; font-size: 0.88rem; line-height: 1.5; color: var(--admin-text-body);">
+                        <strong style="color: #60a5fa;"><i class="fa-solid fa-circle-info" style="margin-right: 6px;"></i>How to bypass YouTube Bot Walls &amp; 403 blocks on Cloud Servers:</strong>
+                        <ol style="margin-top: 8px; margin-left: 20px; padding-left: 0;">
+                            <li>Install the free Chrome/Edge extension: <strong>Get cookies.txt LOCALLY</strong>.</li>
+                            <li>Open <strong>youtube.com</strong> in your browser while logged into your normal Google account.</li>
+                            <li>Click the extension icon, copy the Netscape cookies text, and paste it below.</li>
+                            <li>Click <strong>Save Website Settings</strong>. Your cloud downloader will immediately download all YouTube videos without bot blocks!</li>
+                        </ol>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="youtube_cookies">YouTube Netscape Cookies (cookies.txt format)</label>
+                        <textarea id="youtube_cookies" name="youtube_cookies" rows="8" class="form-textarea" placeholder="# Netscape HTTP Cookie File&#10;.youtube.com	TRUE	/	TRUE	..." style="font-family: var(--font-mono); font-size: 0.82rem;">{{ settings.youtube_cookies or '' }}</textarea>
                     </div>
                 </div>
 

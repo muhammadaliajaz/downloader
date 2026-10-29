@@ -297,9 +297,15 @@ def download_task(task_id, url, format_type, quality, download_dir):
         except Exception:
             return False
 
-    # Check environment variable YOUTUBE_COOKIES, but ONLY write if it is genuine Netscape format
+    # Check environment variable YOUTUBE_COOKIES or database settings, but ONLY write if it is genuine Netscape format
     env_cookie_file = os.path.join(tempfile.gettempdir(), 'env_youtube_cookies.txt')
     raw_cookies = os.environ.get('YOUTUBE_COOKIES', '').strip()
+    if not raw_cookies:
+        try:
+            from core.db import get_setting
+            raw_cookies = (get_setting('youtube_cookies') or '').strip()
+        except Exception:
+            pass
     if raw_cookies:
         decoded_cookies = None
         try:
