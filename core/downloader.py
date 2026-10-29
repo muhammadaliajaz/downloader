@@ -395,27 +395,8 @@ def download_task(task_id, url, format_type, quality, download_dir):
             has_cookies = True
             break
 
-    # Automated YouTube Visitor Session:
-    # If no custom cookies were provided by user or environment, automatically
-    # generate a fresh Chrome-impersonated visitor session via curl_cffi
-    if not has_cookies:
-        try:
-            from curl_cffi import requests as c_requests
-            s = c_requests.Session(impersonate='chrome120')
-            r = s.get('https://www.youtube.com', timeout=8)
-            if r.status_code == 200 and s.cookies:
-                lines = ['# Netscape HTTP Cookie File', '# https://curl.haxx.se/rfc/cookie_spec.html']
-                exp = int(time.time()) + 86400 * 30
-                for name, val in s.cookies.items():
-                    lines.append(f".youtube.com\tTRUE\t/\tTRUE\t{exp}\t{name}\t{val}")
-                auto_cookie_str = '\n'.join(lines)
-                task_cookiefile = os.path.join(tempfile.gettempdir(), f"yt_cookies_{task_id}.txt")
-                with open(task_cookiefile, 'w', encoding='utf-8') as f:
-                    f.write(auto_cookie_str)
-                ydl_opts['cookiefile'] = task_cookiefile
-                has_cookies = True
-        except Exception as e:
-            print("Notice generating auto cookies:", e)
+    # Clean authentic authentication: genuine cookies used ONLY if supplied by user
+
 
     # For YouTube:
     # Do not hardcode player_client when authenticated with cookies so yt-dlp can use its
@@ -492,14 +473,14 @@ def download_task(task_id, url, format_type, quality, download_dir):
                     **ydl_opts,
                     'format': '18/best/b'
                 },
-                # Tier 4: Direct mobile iOS/Android/VisionOS engine (skips webpage)
+                # Tier 4: Pure anonymous TV + VisionOS + Mobile engine (skips webpage, no cookies)
                 {
-                    **ydl_opts,
-                    'format': 'best/18/b',
+                    **{k: v for k, v in ydl_opts.items() if k != 'cookiefile'},
+                    'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best/18/b',
                     'extractor_args': {
                         'youtube': {
                             'player_skip': ['webpage'],
-                            'player_client': ['ios', 'android', 'visionos']
+                            'player_client': ['tv', 'visionos', 'ios', 'android']
                         }
                     }
                 }
