@@ -456,7 +456,8 @@ def health_check():
     """Sanitized public health endpoint for deployment probes and load balancers."""
     return jsonify({
         'status': 'healthy',
-        'service': 'ARY Plus Engine'
+        'service': 'ARY Plus Engine',
+        'version': 'v7'
     })
 
 @app.route('/api/debug_ytdlp')
