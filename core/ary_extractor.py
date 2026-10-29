@@ -1,12 +1,54 @@
+import os
 import requests
 import re
 import logging
+import threading
 
 logger = logging.getLogger("ary_extractor")
 
-# Official public API key embedded in the ARY Plus web application bundle
-ARY_API_KEY = "ak_37515186786306625012043079404171"
 ARY_API_BASE = "https://be.aryplus.tv/api"
+
+_CACHED_ARY_KEY = None
+_ARY_KEY_LOCK = threading.Lock()
+
+def get_ary_api_key() -> str:
+    """
+    Safely resolves the ARY Plus API key:
+    1. Checks ARY_API_KEY environment variable.
+    2. Checks database settings for 'ary_api_key'.
+    3. If not configured, dynamically discovers the public key from the aryplus.tv client bundle.
+    NEVER hardcodes keys in source code.
+    """
+    global _CACHED_ARY_KEY
+    env_key = os.environ.get('ARY_API_KEY')
+    if env_key and env_key.strip():
+        return env_key.strip()
+
+    try:
+        from core.db import get_setting
+        db_key = get_setting('ary_api_key')
+        if db_key and db_key.strip():
+            return db_key.strip()
+    except Exception:
+        pass
+
+    with _ARY_KEY_LOCK:
+        if _CACHED_ARY_KEY:
+            return _CACHED_ARY_KEY
+        try:
+            r = requests.get('https://aryplus.tv/', headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}, timeout=6)
+            scripts = re.findall(r'<script[^>]+src=[\x22\x27]([^\x22\x27]+\.js[^\x22\x27]*)[\x22\x27]', r.text)
+            for s in scripts:
+                url = s if s.startswith('http') else ('https://aryplus.tv' + ('/' if not s.startswith('/') else '') + s)
+                sr = requests.get(url, timeout=6)
+                m = re.search(r'ak_[a-zA-Z0-9]{32}', sr.text)
+                if m:
+                    _CACHED_ARY_KEY = m.group(0)
+                    return _CACHED_ARY_KEY
+        except Exception as e:
+            logger.warning(f"Dynamic ARY API key resolution notice: {e}")
+            
+    return _CACHED_ARY_KEY or ""
 
 def is_ary_url(url: str) -> bool:
     if not url:
@@ -36,9 +78,10 @@ def extract_ary_stream(url: str) -> dict:
             }
         return {}
 
+    api_key = get_ary_api_key()
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'x-api-key': ARY_API_KEY,
+        'x-api-key': api_key,
         'Origin': 'https://aryplus.tv',
         'Referer': 'https://aryplus.tv/'
     }

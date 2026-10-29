@@ -148,23 +148,44 @@ start_cleanup_scheduler(DOWNLOADS_DIR)
 # Pre-warm Supabase PostgreSQL connection pool asynchronously for instant page loads
 prewarm_database_pool()
 
+ALLOWED_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'ico'}
+
 def _restore_media_files_from_db():
+    """
+    On container startup, securely restores uploaded media files from Supabase
+    database with strict path traversal containment and pattern validation.
+    """
     try:
         conn = get_db_connection()
         rows = conn.execute("SELECT filename, file_data FROM media WHERE file_data IS NOT NULL").fetchall()
         conn.close()
+        uploads_canonical = os.path.realpath(os.path.abspath(UPLOADS_DIR))
         for r in rows:
             fname = r['filename']
-            fpath = os.path.join(UPLOADS_DIR, fname)
-            if not os.path.isfile(fpath) and r['file_data']:
+            if not fname or not isinstance(fname, str):
+                continue
+            clean_fname = os.path.basename(fname.strip())
+            # Enforce strict alphanumeric + underscore + hyphen + single dot extension
+            if not re.match(r'^[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+$', clean_fname):
+                continue
+            ext = clean_fname.rsplit('.', 1)[-1].lower() if '.' in clean_fname else ''
+            if ext not in ALLOWED_IMAGE_EXTENSIONS:
+                continue
+            safe_path = safe_join(UPLOADS_DIR, clean_fname)
+            if not safe_path:
+                continue
+            resolved_path = os.path.realpath(os.path.abspath(safe_path))
+            if not is_safe_filepath(resolved_path, uploads_canonical):
+                continue
+            if not os.path.isfile(resolved_path) and r['file_data']:
                 try:
                     import base64
                     raw = base64.b64decode(r['file_data'])
-                    os.makedirs(os.path.dirname(fpath), exist_ok=True)
-                    with open(fpath, 'wb') as f_out:
+                    os.makedirs(os.path.dirname(resolved_path), exist_ok=True)
+                    with open(resolved_path, 'wb') as f_out:
                         f_out.write(raw)
                 except Exception as e:
-                    print(f"Failed to restore media file {fname}: {e}")
+                    print(f"Failed to restore media file {clean_fname}: {e}")
     except Exception as e:
         print("Media startup restoration notice:", e)
 
@@ -487,11 +508,7 @@ def preview_ui():
 @app.route('/api/health')
 def health_check():
     """Sanitized public health endpoint for deployment probes and load balancers."""
-    return jsonify({
-        'status': 'healthy',
-        'service': 'ARY Plus Engine',
-        'version': 'v8'
-    })
+    return jsonify({'status': 'healthy'})
 
 @app.route('/api/debug_ytdlp')
 @login_required
@@ -755,6 +772,8 @@ def download_file(task_id):
         conditional=True,
         max_age=86400
     )
+    if hasattr(response.response, 'buffer_size'):
+        response.response.buffer_size = 4 * 1024 * 1024  # 4MB chunk buffer for high-throughput socket saturation
     safe_ascii_name = clean_download_name.encode('ascii', 'ignore').decode('ascii') or 'video.mp4'
     quoted_name = urllib.parse.quote(clean_download_name)
     response.headers['Content-Disposition'] = f'attachment; filename="{safe_ascii_name}"; filename*=UTF-8\'\'{quoted_name}'
