@@ -640,7 +640,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
         elif any(k in err_msg.lower() for k in ['expecting value', 'jsondecode', 'line 1 column 1']):
             err_msg = 'The video stream provider sent a temporary response. Please try again or paste another video URL.'
         elif any(k in err_msg.lower() for k in ['sign in', 'confirm you', 'bot']):
-            err_msg = 'This video requires account verification or is restricted by the provider. Please try another video link.'
+            err_msg = f'This video requires account verification or is restricted by the provider. ({err_msg[:200]})'
         with CACHE_LOCK:
             PROGRESS_CACHE[task_id] = {
                 'status': 'error', 
