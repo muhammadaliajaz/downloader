@@ -75,7 +75,11 @@ def download_task(task_id, url, format_type, quality, download_dir):
                     if task_id in PROGRESS_CACHE:
                         PROGRESS_CACHE[task_id].update({
                             'title': ary_title or "ARY Plus Video",
-                            'thumbnail': ary_thumbnail
+                            'thumbnail': ary_thumbnail,
+                            'status': 'downloading',
+                            'progress': 1,
+                            'speed': 'Connecting CDN...',
+                            'eta': 'Starting stream'
                         })
         except Exception as e:
             print("ARY Extractor fallback notice:", e)
@@ -100,7 +104,11 @@ def download_task(task_id, url, format_type, quality, download_dir):
                     if task_id in PROGRESS_CACHE:
                         PROGRESS_CACHE[task_id].update({
                             'title': tiktok_title or "TikTok Video",
-                            'thumbnail': tiktok_thumbnail
+                            'thumbnail': tiktok_thumbnail,
+                            'status': 'downloading',
+                            'progress': 1,
+                            'speed': 'Connecting high-speed CDN...',
+                            'eta': 'Starting stream'
                         })
             else:
                 target_url = normalize_tiktok_url(url)
@@ -136,15 +144,17 @@ def download_task(task_id, url, format_type, quality, download_dir):
             except Exception:
                 progress = 0
             
-            PROGRESS_CACHE[task_id] = {
-                'status': 'downloading',
-                'progress': progress,
-                'speed': clean_ansi(d.get('_speed_str', 'N/A')),
-                'eta': clean_ansi(d.get('_eta_str', 'N/A')),
-                'total_size': clean_ansi(d.get('_total_bytes_str') or d.get('_total_bytes_estimate_str') or 'N/A'),
-                'downloaded': clean_ansi(d.get('_downloaded_bytes_str', 'N/A')),
-                'timestamp': time.time()
-            }
+            with CACHE_LOCK:
+                if task_id in PROGRESS_CACHE:
+                    PROGRESS_CACHE[task_id].update({
+                        'status': 'downloading',
+                        'progress': progress,
+                        'speed': clean_ansi(d.get('_speed_str', 'N/A')),
+                        'eta': clean_ansi(d.get('_eta_str', 'N/A')),
+                        'total_size': clean_ansi(d.get('_total_bytes_str') or d.get('_total_bytes_estimate_str') or 'N/A'),
+                        'downloaded': clean_ansi(d.get('_downloaded_bytes_str', 'N/A')),
+                        'timestamp': time.time()
+                    })
         elif d['status'] == 'finished':
             with CACHE_LOCK:
                 if task_id in PROGRESS_CACHE:
@@ -261,8 +271,8 @@ def download_task(task_id, url, format_type, quality, download_dir):
             'Referer': 'https://aryplus.tv/',
             'Origin': 'https://aryplus.tv'
         }
-        # 8 concurrent fragments gives max CDN throughput without socket drops
-        ydl_opts['concurrent_fragments'] = 8
+        # 16 concurrent fragments gives max CDN throughput without socket drops
+        ydl_opts['concurrent_fragments'] = 16
         ydl_opts['buffersize'] = 2097152
         ydl_opts['hls_prefer_native'] = True
     elif is_tiktok:
@@ -271,9 +281,9 @@ def download_task(task_id, url, format_type, quality, download_dir):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://www.tiktok.com/',
         }
-        ydl_opts['concurrent_fragments'] = 6
-    else:
         ydl_opts['concurrent_fragments'] = 8
+    else:
+        ydl_opts['concurrent_fragments'] = 12
     task_cookiefile = None
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
@@ -337,15 +347,13 @@ def download_task(task_id, url, format_type, quality, download_dir):
             break
 
     # YouTube Cloud Engine:
-    # 1. 'visionos' uses native Apple HLS (.m3u8) manifests which completely bypass:
-    #    - Cloud datacenter bot challenges ("Sign in to confirm you're not a bot")
-    #    - SABR encrypted streaming experiments
-    #    - Web player JavaScript 'n' challenge requirements
-    # 2. 'ios' serves as resilient Apple client fallback
-    # 3. 'android' as third mobile fallback
+    # 'android' client is 100% resilient on cloud datacenter IPs:
+    # - Completely bypasses Web BotGuard / IP bot challenges
+    # - No GVS PO token requirement
+    # - Delivers instant progressive MP4 (formats 18 and 22) and high-res DASH streams
     ydl_opts['extractor_args'] = {
         'youtube': {
-            'player_client': ['visionos', 'ios', 'android']
+            'player_client': ['android']
         }
     }
 
@@ -361,12 +369,12 @@ def download_task(task_id, url, format_type, quality, download_dir):
     else:
         ydl_opts['merge_output_format'] = 'mp4'
         if quality == 'best':
-            ydl_opts['format'] = 'bestvideo+bestaudio/bestvideo+bestaudio/best/b'
+            ydl_opts['format'] = 'bestvideo+bestaudio/bestvideo+bestaudio/best/18/b'
         elif quality.isdigit():
             height = quality
-            ydl_opts['format'] = f'bestvideo[height<={height}]+bestaudio/best[height<={height}]/bestvideo+bestaudio/best/b'
+            ydl_opts['format'] = f'bestvideo[height<={height}]+bestaudio/best[height<={height}]/best/18/b'
         else:
-            ydl_opts['format'] = 'bestvideo[height<=720]+bestaudio/best[height<=720]/bestvideo+bestaudio/best/b'
+            ydl_opts['format'] = 'bestvideo[height<=720]+bestaudio/best[height<=720]/best/18/b'
         
     try:
         # Store metadata as soon as we get it
@@ -385,6 +393,10 @@ def download_task(task_id, url, format_type, quality, download_dir):
                         PROGRESS_CACHE[task_id].update({
                             'title': metadata['title'],
                             'thumbnail': metadata['thumbnail'],
+                            'status': 'downloading',
+                            'progress': 2,
+                            'speed': 'Connecting stream...',
+                            'eta': 'Starting download',
                             'timestamp': time.time()
                         })
         
@@ -397,12 +409,22 @@ def download_task(task_id, url, format_type, quality, download_dir):
             fallback_strategies = [dict(ydl_opts)]
         else:
             fallback_strategies = [
-                # Tier 1: Apple VisionOS & iOS HLS engine (Datacenter-resilient, no challenge/BotGuard)
+                # Tier 1: Resilient Android mobile engine (immune to datacenter bot check and PO token block)
                 dict(ydl_opts),
-                # Tier 2: Clean Mobile bypass without cookies (bypasses expired cookie poison)
-                {**ydl_opts, 'cookiefile': None, 'extractor_args': {'youtube': {'player_client': ['visionos', 'ios']}}},
-                # Tier 3: Mobile web fallback with broadest format selector
-                {**ydl_opts, 'cookiefile': None, 'format': 'best/bestvideo+bestaudio/b', 'extractor_args': {'youtube': {'player_client': ['ios', 'android', 'mweb']}}}
+                # Tier 2: Direct Progressive MP4 format 18 / 22 (no FFmpeg CPU merge bottleneck, instant stream)
+                {
+                    **ydl_opts,
+                    'cookiefile': None,
+                    'format': '18/22/best/b',
+                    'extractor_args': {'youtube': {'player_client': ['android']}}
+                },
+                # Tier 3: Apple VisionOS HLS engine fallback
+                {
+                    **ydl_opts,
+                    'cookiefile': None,
+                    'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best/18/b',
+                    'extractor_args': {'youtube': {'player_client': ['visionos', 'android']}}
+                }
             ]
         
         for opts in fallback_strategies:

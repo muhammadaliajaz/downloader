@@ -11,6 +11,7 @@ import re
 from flask import Flask, render_template, request, jsonify, Response, send_file, redirect, url_for, session, g, abort
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import safe_join
+from werkzeug.wsgi import wrap_file
 
 from core.downloader import start_download_thread, get_progress, cancel_download
 from core.cleanup import start_cleanup_scheduler
@@ -714,17 +715,27 @@ def download_file(task_id):
     }
     mimetype = MEDIA_MIMETYPES.get(ext.lower(), 'application/octet-stream')
 
-    response = send_file(
-        file_path,
-        as_attachment=True,
-        download_name=clean_download_name,
+    file_size = os.path.getsize(file_path)
+    file_handle = open(file_path, 'rb')
+    wrapped_file = wrap_file(request.environ, file_handle, buffer_size=262144)
+    response = Response(
+        wrapped_file,
         mimetype=mimetype,
-        conditional=True,
-        max_age=3600
+        direct_passthrough=True
     )
+    response.call_on_close(file_handle.close)
+    response.content_length = file_size
+
+    # RFC 5987 / 6266 content disposition for Unicode filenames and ASCII fallbacks
+    safe_ascii_name = clean_download_name.encode('ascii', 'ignore').decode('ascii') or 'video.mp4'
+    quoted_name = urllib.parse.quote(clean_download_name)
+    response.headers['Content-Disposition'] = f'attachment; filename="{safe_ascii_name}"; filename*=UTF-8\'\'{quoted_name}'
     response.headers['Accept-Ranges'] = 'bytes'
-    response.headers['Cache-Control'] = 'public, max-age=3600, no-transform'
+    response.headers['Cache-Control'] = 'public, max-age=86400, no-transform'
     response.headers['X-Content-Type-Options'] = 'nosniff'
+
+    # Support byte-range requests for download accelerators (IDM, etc.) and resume
+    response = response.make_conditional(request.environ, accept_ranges=True, complete_length=file_size)
     return response
 
 if __name__ == '__main__':
