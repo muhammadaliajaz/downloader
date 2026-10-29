@@ -254,23 +254,26 @@ def download_task(task_id, url, format_type, quality, download_dir):
             ydl_opts['remote_components'] = ['ejs:github']
 
     if is_ary:
+        # ARY Plus is native HLS (.m3u8). Remove http_chunk_size so fragments download cleanly without invalid byte-range headers
+        ydl_opts.pop('http_chunk_size', None)
         ydl_opts['http_headers'] = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://aryplus.tv/',
             'Origin': 'https://aryplus.tv'
         }
-        # 16 concurrent fragments gives 2x CDN throughput
-        ydl_opts['concurrent_fragments'] = 16
+        # 8 concurrent fragments gives max CDN throughput without socket drops
+        ydl_opts['concurrent_fragments'] = 8
         ydl_opts['buffersize'] = 2097152
         ydl_opts['hls_prefer_native'] = True
     elif is_tiktok:
+        ydl_opts.pop('http_chunk_size', None)
         ydl_opts['http_headers'] = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://www.tiktok.com/',
         }
-        ydl_opts['concurrent_fragments'] = 8
+        ydl_opts['concurrent_fragments'] = 6
     else:
-        ydl_opts['concurrent_fragments'] = 16
+        ydl_opts['concurrent_fragments'] = 8
     task_cookiefile = None
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
@@ -390,14 +393,17 @@ def download_task(task_id, url, format_type, quality, download_dir):
         ydl_opts['progress_hooks'] = [pre_download_hook] + original_hooks
         
         # Multi-tier extraction with automatic fallback for bot detection & format missing
-        fallback_strategies = [
-            # Tier 1: Apple VisionOS & iOS HLS engine (Datacenter-resilient, no challenge/BotGuard)
-            dict(ydl_opts),
-            # Tier 2: Clean Mobile bypass without cookies (bypasses expired cookie poison)
-            {**ydl_opts, 'cookiefile': None, 'extractor_args': {'youtube': {'player_client': ['visionos', 'ios']}}},
-            # Tier 3: Mobile web fallback with broadest format selector
-            {**ydl_opts, 'cookiefile': None, 'format': 'best/bestvideo+bestaudio/b', 'extractor_args': {'youtube': {'player_client': ['ios', 'android', 'mweb']}}}
-        ]
+        if is_ary or is_tiktok:
+            fallback_strategies = [dict(ydl_opts)]
+        else:
+            fallback_strategies = [
+                # Tier 1: Apple VisionOS & iOS HLS engine (Datacenter-resilient, no challenge/BotGuard)
+                dict(ydl_opts),
+                # Tier 2: Clean Mobile bypass without cookies (bypasses expired cookie poison)
+                {**ydl_opts, 'cookiefile': None, 'extractor_args': {'youtube': {'player_client': ['visionos', 'ios']}}},
+                # Tier 3: Mobile web fallback with broadest format selector
+                {**ydl_opts, 'cookiefile': None, 'format': 'best/bestvideo+bestaudio/b', 'extractor_args': {'youtube': {'player_client': ['ios', 'android', 'mweb']}}}
+            ]
         
         for opts in fallback_strategies:
             if opts.get('cookiefile') is None and 'cookiefile' in opts:
