@@ -590,7 +590,7 @@ def status(task_id):
     initial_check = get_progress(task_id)
     if initial_check is None:
         # Grace period for worker thread launch
-        for _ in range(2):
+        for _ in range(5):
             time.sleep(1)
             initial_check = get_progress(task_id)
             if initial_check:

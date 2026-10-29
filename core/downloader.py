@@ -676,6 +676,14 @@ def download_task(task_id, url, format_type, quality, download_dir):
                 del CANCEL_EVENTS[task_id]
 
 def start_download_thread(task_id, url, format_type, quality, download_dir):
+    with CACHE_LOCK:
+        PROGRESS_CACHE[task_id] = {
+            'status': 'processing', 
+            'progress': 0, 
+            'timestamp': time.time()
+        }
+        _save_task_cache(task_id, PROGRESS_CACHE[task_id])
+
     def _guarded_worker():
         with ssrf_safe_socket():
             download_task(task_id, url, format_type, quality, download_dir)
