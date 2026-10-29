@@ -665,10 +665,7 @@ def download_file(task_id):
     except ValueError:
         return jsonify({'error': 'Invalid task ID format'}), 400
 
-    progress_data = get_progress(task_id)
-    if not progress_data or progress_data.get('status') != 'finished':
-        return jsonify({'error': 'File not ready or task not found'}), 404
-        
+    progress_data = get_progress(task_id) or {}
     file_path = progress_data.get('filepath')
     
     # Resilient fallback: locate task file in DOWNLOADS_DIR if path was slightly mismatched
@@ -682,7 +679,7 @@ def download_file(task_id):
 
     # Path Traversal Guard & File Existence Check
     if not file_path or not is_safe_filepath(file_path, DOWNLOADS_DIR) or not os.path.isfile(file_path):
-        return jsonify({'error': 'Access Denied: Invalid or restricted file path'}), 403
+        return jsonify({'error': 'File not ready or task not found'}), 404
 
     # Clean download name for the user's browser
     raw_title = progress_data.get('title') or 'video'

@@ -5,6 +5,7 @@ import threading
 import re
 import time
 import tempfile
+import json
 
 from core.ary_extractor import extract_ary_stream, is_ary_url
 from core.tiktok_extractor import extract_tiktok_stream, is_tiktok_url, normalize_tiktok_url
@@ -14,6 +15,17 @@ PROGRESS_CACHE = {}
 CANCEL_EVENTS = {}
 CACHE_LOCK = threading.Lock()
 CANCEL_LOCK = threading.Lock()
+
+TASK_CACHE_DIR = os.path.join(tempfile.gettempdir(), 'ytdl_task_cache')
+os.makedirs(TASK_CACHE_DIR, exist_ok=True)
+
+def _save_task_cache(task_id, data):
+    try:
+        fpath = os.path.join(TASK_CACHE_DIR, f"{task_id}.json")
+        with open(fpath, 'w', encoding='utf-8') as f:
+            json.dump(data, f)
+    except Exception:
+        pass
 
 class CancelledError(Exception):
     """Custom exception to signal download cancellation."""
@@ -30,15 +42,45 @@ def _prune_cache():
         for tid in to_delete:
             del PROGRESS_CACHE[tid]
 
+    try:
+        if os.path.isdir(TASK_CACHE_DIR):
+            for fname in os.listdir(TASK_CACHE_DIR):
+                fpath = os.path.join(TASK_CACHE_DIR, fname)
+                if os.path.isfile(fpath) and now - os.path.getmtime(fpath) > 7200:
+                    try:
+                        os.remove(fpath)
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
 def get_progress(task_id):
-    return PROGRESS_CACHE.get(task_id)
+    with CACHE_LOCK:
+        if task_id in PROGRESS_CACHE:
+            return dict(PROGRESS_CACHE[task_id])
+    try:
+        fpath = os.path.join(TASK_CACHE_DIR, f"{task_id}.json")
+        if os.path.isfile(fpath):
+            with open(fpath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                with CACHE_LOCK:
+                    PROGRESS_CACHE[task_id] = data
+                return data
+    except Exception:
+        pass
+    return None
 
 def cancel_download(task_id):
     with CANCEL_LOCK:
         if task_id in CANCEL_EVENTS:
             CANCEL_EVENTS[task_id].set()
-            return True
-    return False
+    try:
+        cflag = os.path.join(TASK_CACHE_DIR, f"{task_id}.cancel")
+        with open(cflag, 'w', encoding='utf-8') as f:
+            f.write('1')
+        return True
+    except Exception:
+        return False
 
 def download_task(task_id, url, format_type, quality, download_dir):
     _prune_cache()
@@ -54,6 +96,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
             'progress': 0, 
             'timestamp': time.time()
         }
+        _save_task_cache(task_id, PROGRESS_CACHE[task_id])
 
     # ARY Plus / ARY Zap Native Direct Stream Extractor
     target_url = url
@@ -120,7 +163,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
 
     def my_hook(d):
         # Check for cancellation
-        if cancel_event.is_set():
+        if cancel_event.is_set() or os.path.exists(os.path.join(TASK_CACHE_DIR, f"{task_id}.cancel")):
             raise CancelledError("User requested cancellation")
 
         # DoS Defense: Abort downloads exceeding 2 GB to protect server disk space
@@ -352,17 +395,37 @@ def download_task(task_id, url, format_type, quality, download_dir):
             has_cookies = True
             break
 
-    # YouTube Cloud Engine:
-    # 1. 'visionos' uses native Apple HLS (.m3u8) manifests which completely bypass:
-    #    - Cloud datacenter bot challenges ("Sign in to confirm you're not a bot")
-    #    - SABR encrypted streaming experiments
-    #    - Web player JavaScript 'n' challenge requirements
-    #    - GVS PO token requirements
-    ydl_opts['extractor_args'] = {
-        'youtube': {
-            'player_client': ['visionos']
+    # Automated YouTube Visitor Session:
+    # If no custom cookies were provided by user or environment, automatically
+    # generate a fresh Chrome-impersonated visitor session via curl_cffi
+    if not has_cookies:
+        try:
+            from curl_cffi import requests as c_requests
+            s = c_requests.Session(impersonate='chrome120')
+            r = s.get('https://www.youtube.com', timeout=8)
+            if r.status_code == 200 and s.cookies:
+                lines = ['# Netscape HTTP Cookie File', '# https://curl.haxx.se/rfc/cookie_spec.html']
+                exp = int(time.time()) + 86400 * 30
+                for name, val in s.cookies.items():
+                    lines.append(f".youtube.com\tTRUE\t/\tTRUE\t{exp}\t{name}\t{val}")
+                auto_cookie_str = '\n'.join(lines)
+                task_cookiefile = os.path.join(tempfile.gettempdir(), f"yt_cookies_{task_id}.txt")
+                with open(task_cookiefile, 'w', encoding='utf-8') as f:
+                    f.write(auto_cookie_str)
+                ydl_opts['cookiefile'] = task_cookiefile
+                has_cookies = True
+        except Exception as e:
+            print("Notice generating auto cookies:", e)
+
+    # For YouTube:
+    # Do not hardcode player_client when authenticated with cookies so yt-dlp can use its
+    # full suite of cookie-compatible clients (web, web_embedded, mweb, tv)
+    if not has_cookies:
+        ydl_opts['extractor_args'] = {
+            'youtube': {
+                'player_client': ['visionos']
+            }
         }
-    }
 
     if format_type == 'mp3':
         ydl_opts.update({
@@ -406,6 +469,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
                             'eta': 'Starting download',
                             'timestamp': time.time()
                         })
+                        _save_task_cache(task_id, PROGRESS_CACHE[task_id])
         
         # Add the hook to get early metadata
         original_hooks = ydl_opts.get('progress_hooks', [])
@@ -416,21 +480,23 @@ def download_task(task_id, url, format_type, quality, download_dir):
             fallback_strategies = [dict(ydl_opts)]
         else:
             fallback_strategies = [
-                # Tier 1: Apple VisionOS native HLS engine (Datacenter-resilient, no bot wall, no 403)
+                # Tier 1: Primary smart extraction (with authenticated session)
                 dict(ydl_opts),
-                # Tier 2: Apple VisionOS with broad format selector
+                # Tier 2: Broad resilient format selector (preserves cookies)
                 {
                     **ydl_opts,
-                    'cookiefile': None,
+                    'format': 'best/bestvideo+bestaudio/18/b'
+                },
+                # Tier 3: Direct progressive format 18 (preserves cookies)
+                {
+                    **ydl_opts,
+                    'format': '18/best/b'
+                },
+                # Tier 4: Pure anonymous Apple VisionOS engine (bypasses bot wall if cookies fail/expire)
+                {
+                    **{k: v for k, v in ydl_opts.items() if k != 'cookiefile'},
                     'format': 'best/bestvideo+bestaudio/b',
                     'extractor_args': {'youtube': {'player_client': ['visionos']}}
-                },
-                # Tier 3: Android mobile fallback (in case video lacks VisionOS manifest)
-                {
-                    **ydl_opts,
-                    'cookiefile': None,
-                    'format': '18/best/b',
-                    'extractor_args': {'youtube': {'player_client': ['android']}}
                 }
             ]
         
@@ -559,12 +625,14 @@ def download_task(task_id, url, format_type, quality, download_dir):
                 'title': title,
                 'thumbnail': thumbnail
             }
+            _save_task_cache(task_id, PROGRESS_CACHE[task_id])
     except CancelledError:
         with CACHE_LOCK:
             PROGRESS_CACHE[task_id] = {
                 'status': 'cancelled',
                 'timestamp': time.time()
             }
+            _save_task_cache(task_id, PROGRESS_CACHE[task_id])
         # Cleanup partial files
         for f in os.listdir(download_dir):
             if f.startswith(task_id) and (f.endswith('.part') or f.endswith('.temp')):
@@ -593,6 +661,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
                 'error': err_msg,
                 'timestamp': time.time()
             }
+            _save_task_cache(task_id, PROGRESS_CACHE[task_id])
     finally:
         if task_cookiefile and os.path.exists(task_cookiefile):
             try:
