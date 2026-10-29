@@ -347,13 +347,14 @@ def download_task(task_id, url, format_type, quality, download_dir):
             break
 
     # YouTube Cloud Engine:
-    # 'android' client is 100% resilient on cloud datacenter IPs:
-    # - Completely bypasses Web BotGuard / IP bot challenges
-    # - No GVS PO token requirement
-    # - Delivers instant progressive MP4 (formats 18 and 22) and high-res DASH streams
+    # 1. 'visionos' uses native Apple HLS (.m3u8) manifests which completely bypass:
+    #    - Cloud datacenter bot challenges ("Sign in to confirm you're not a bot")
+    #    - SABR encrypted streaming experiments
+    #    - Web player JavaScript 'n' challenge requirements
+    #    - GVS PO token requirements
     ydl_opts['extractor_args'] = {
         'youtube': {
-            'player_client': ['android']
+            'player_client': ['visionos']
         }
     }
 
@@ -409,21 +410,21 @@ def download_task(task_id, url, format_type, quality, download_dir):
             fallback_strategies = [dict(ydl_opts)]
         else:
             fallback_strategies = [
-                # Tier 1: Resilient Android mobile engine (immune to datacenter bot check and PO token block)
+                # Tier 1: Apple VisionOS native HLS engine (Datacenter-resilient, no bot wall, no 403)
                 dict(ydl_opts),
-                # Tier 2: Direct Progressive MP4 format 18 / 22 (no FFmpeg CPU merge bottleneck, instant stream)
+                # Tier 2: Apple VisionOS with broad format selector
                 {
                     **ydl_opts,
                     'cookiefile': None,
-                    'format': '18/22/best/b',
-                    'extractor_args': {'youtube': {'player_client': ['android']}}
+                    'format': 'best/bestvideo+bestaudio/b',
+                    'extractor_args': {'youtube': {'player_client': ['visionos']}}
                 },
-                # Tier 3: Apple VisionOS HLS engine fallback
+                # Tier 3: Android mobile fallback (in case video lacks VisionOS manifest)
                 {
                     **ydl_opts,
                     'cookiefile': None,
-                    'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best/18/b',
-                    'extractor_args': {'youtube': {'player_client': ['visionos', 'android']}}
+                    'format': '18/best/b',
+                    'extractor_args': {'youtube': {'player_client': ['android']}}
                 }
             ]
         
