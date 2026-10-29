@@ -307,16 +307,15 @@ def download_task(task_id, url, format_type, quality, download_dir):
             ydl_opts['remote_components'] = ['ejs:github']
 
     if is_ary:
-        # ARY Plus is native HLS (.m3u8). Remove http_chunk_size so fragments download cleanly without invalid byte-range headers
+        # ARY Plus is native HLS (.m3u8). 32 parallel fragment streams saturate gigabit CDN bandwidth
         ydl_opts.pop('http_chunk_size', None)
         ydl_opts['http_headers'] = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://aryplus.tv/',
             'Origin': 'https://aryplus.tv'
         }
-        # 16 concurrent fragments gives max CDN throughput without socket drops
-        ydl_opts['concurrent_fragments'] = 16
-        ydl_opts['buffersize'] = 2097152
+        ydl_opts['concurrent_fragments'] = 32
+        ydl_opts['buffersize'] = 4194304
         ydl_opts['hls_prefer_native'] = True
     elif is_tiktok:
         ydl_opts.pop('http_chunk_size', None)
@@ -324,9 +323,12 @@ def download_task(task_id, url, format_type, quality, download_dir):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://www.tiktok.com/',
         }
-        ydl_opts['concurrent_fragments'] = 8
+        ydl_opts['concurrent_fragments'] = 16
+        ydl_opts['buffersize'] = 4194304
     else:
-        ydl_opts['concurrent_fragments'] = 12
+        ydl_opts['concurrent_fragments'] = 16
+        ydl_opts['buffersize'] = 4194304
+        ydl_opts['http_chunk_size'] = 20971520 # 20MB chunking prevents YouTube speed throttling
     task_cookiefile = None
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
@@ -461,19 +463,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
             fallback_strategies = [dict(ydl_opts)]
         else:
             fallback_strategies = [
-                # Tier 1: Primary TV + Mobile + VisionOS engine (skips blocked webpage)
-                dict(ydl_opts),
-                # Tier 2: Resilient broad format selector
-                {
-                    **ydl_opts,
-                    'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best/18/b'
-                },
-                # Tier 3: Direct progressive format 18
-                {
-                    **ydl_opts,
-                    'format': '18/best/b'
-                },
-                # Tier 4: Pure anonymous TV + VisionOS + Mobile engine (skips webpage, no cookies)
+                # Tier 1: Pure Apple VisionOS + TV + Mobile engine (Anonymous, zero webpage download, zero SABR restriction, zero bot blocks)
                 {
                     **{k: v for k, v in ydl_opts.items() if k != 'cookiefile'},
                     'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best/18/b',
@@ -483,6 +473,24 @@ def download_task(task_id, url, format_type, quality, download_dir):
                             'player_client': ['tv', 'visionos', 'ios', 'android']
                         }
                     }
+                },
+                # Tier 2: Resilient broad format selector (Anonymous, SABR-exempt)
+                {
+                    **{k: v for k, v in ydl_opts.items() if k != 'cookiefile'},
+                    'format': 'best/bestvideo+bestaudio/18/b',
+                    'extractor_args': {
+                        'youtube': {
+                            'player_skip': ['webpage'],
+                            'player_client': ['visionos', 'ios', 'android']
+                        }
+                    }
+                },
+                # Tier 3: Authenticated session fallback (Used ONLY if video is private or age-restricted)
+                dict(ydl_opts),
+                # Tier 4: Direct progressive format 18
+                {
+                    **ydl_opts,
+                    'format': '18/best/b'
                 }
             ]
         

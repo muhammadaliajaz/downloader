@@ -1012,6 +1012,10 @@
                 }
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalBtnHtml;
+
+                setTimeout(() => {
+                    try { downloadFinalBtn.click(); } catch(e) {}
+                }, 350);
             }
 
             function showError(msg) {

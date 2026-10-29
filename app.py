@@ -118,10 +118,21 @@ if ADMIN_SLUG != 'admin':
 # Global Jinja Template Context Processor (Auto-syncs settings to ALL templates)
 @app.context_processor
 def inject_globals():
+    user = get_current_user()
+    is_admin = False
+    if user:
+        try:
+            is_admin = (user['role'] == 'admin')
+        except Exception:
+            pass
+    all_settings = get_all_settings()
+    # Security: Strictly isolate authentication cookies so non-admin visitors can NEVER access them
+    if not is_admin:
+        all_settings = {k: v for k, v in all_settings.items() if k != 'youtube_cookies'}
     return {
         'csrf_token': generate_csrf_token,
-        'current_user': get_current_user(),
-        'settings': get_all_settings(),
+        'current_user': user,
+        'settings': all_settings,
         'csp_nonce': getattr(g, 'csp_nonce', ''),
         'admin_slug': ADMIN_SLUG
     }
@@ -136,6 +147,28 @@ start_cleanup_scheduler(DOWNLOADS_DIR)
 
 # Pre-warm Supabase PostgreSQL connection pool asynchronously for instant page loads
 prewarm_database_pool()
+
+def _restore_media_files_from_db():
+    try:
+        conn = get_db_connection()
+        rows = conn.execute("SELECT filename, file_data FROM media WHERE file_data IS NOT NULL").fetchall()
+        conn.close()
+        for r in rows:
+            fname = r['filename']
+            fpath = os.path.join(UPLOADS_DIR, fname)
+            if not os.path.isfile(fpath) and r['file_data']:
+                try:
+                    import base64
+                    raw = base64.b64decode(r['file_data'])
+                    os.makedirs(os.path.dirname(fpath), exist_ok=True)
+                    with open(fpath, 'wb') as f_out:
+                        f_out.write(raw)
+                except Exception as e:
+                    print(f"Failed to restore media file {fname}: {e}")
+    except Exception as e:
+        print("Media startup restoration notice:", e)
+
+threading.Thread(target=_restore_media_files_from_db, daemon=True).start()
 
 # Custom Security Error Handlers (Prevents Framework Information Disclosure)
 @app.errorhandler(400)
@@ -275,7 +308,7 @@ def apply_security_headers(response):
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains; preload'
 
     # Prevent intermediate proxy caching of authenticated and personalized session pages (GHSA-68rp-wp8r-4726)
-    if request.path.startswith(f'/{ADMIN_SLUG}') or request.path.startswith('/admin') or session.get('user_id') or session.get('_csrf_token'):
+    if (request.path.startswith(f'/{ADMIN_SLUG}') or request.path.startswith('/admin') or session.get('user_id') or session.get('_csrf_token')) and not (request.path.startswith('/api/files/') or request.path.startswith('/static/')):
         response.headers['Vary'] = 'Cookie'
 
     # Anti-indexing headers: Ensure Search Engines NEVER index admin panel, login, setup, or internal APIs
@@ -713,27 +746,23 @@ def download_file(task_id):
     }
     mimetype = MEDIA_MIMETYPES.get(ext.lower(), 'application/octet-stream')
 
-    file_size = os.path.getsize(file_path)
-    file_handle = open(file_path, 'rb')
-    wrapped_file = wrap_file(request.environ, file_handle, buffer_size=1048576)
-    response = Response(
-        wrapped_file,
+    # High-Performance Linux Zero-Copy Streaming via send_file (activates os.sendfile in Gunicorn)
+    response = send_file(
+        file_path,
+        as_attachment=True,
+        download_name=clean_download_name,
         mimetype=mimetype,
-        direct_passthrough=True
+        conditional=True,
+        max_age=86400
     )
-    response.call_on_close(file_handle.close)
-    response.content_length = file_size
-
-    # RFC 5987 / 6266 content disposition for Unicode filenames and ASCII fallbacks
     safe_ascii_name = clean_download_name.encode('ascii', 'ignore').decode('ascii') or 'video.mp4'
     quoted_name = urllib.parse.quote(clean_download_name)
     response.headers['Content-Disposition'] = f'attachment; filename="{safe_ascii_name}"; filename*=UTF-8\'\'{quoted_name}'
     response.headers['Accept-Ranges'] = 'bytes'
     response.headers['Cache-Control'] = 'public, max-age=86400, no-transform'
     response.headers['X-Content-Type-Options'] = 'nosniff'
-
-    # Support byte-range requests for download accelerators (IDM, etc.) and resume
-    response = response.make_conditional(request.environ, accept_ranges=True, complete_length=file_size)
+    response.headers['Connection'] = 'keep-alive'
+    response.headers['Keep-Alive'] = 'timeout=65, max=1000'
     return response
 
 if __name__ == '__main__':
