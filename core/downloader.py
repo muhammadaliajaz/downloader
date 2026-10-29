@@ -259,8 +259,8 @@ def download_task(task_id, url, format_type, quality, download_dir):
             'Referer': 'https://aryplus.tv/',
             'Origin': 'https://aryplus.tv'
         }
-        # 8 concurrent fragments gives max CDN throughput without socket drops
-        ydl_opts['concurrent_fragments'] = 8
+        # 16 concurrent fragments gives 2x CDN throughput
+        ydl_opts['concurrent_fragments'] = 16
         ydl_opts['buffersize'] = 2097152
         ydl_opts['hls_prefer_native'] = True
     elif is_tiktok:
@@ -268,9 +268,9 @@ def download_task(task_id, url, format_type, quality, download_dir):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://www.tiktok.com/',
         }
-        ydl_opts['concurrent_fragments'] = 6
-    else:
         ydl_opts['concurrent_fragments'] = 8
+    else:
+        ydl_opts['concurrent_fragments'] = 16
     task_cookiefile = None
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     

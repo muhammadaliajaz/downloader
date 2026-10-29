@@ -373,13 +373,13 @@
             <div class="success-check-icon">
                 <i class="fa-solid fa-check"></i>
             </div>
-            <h3>Extraction Complete!</h3>
-            <p id="successFileTitle">Your high-definition media file is ready for download.</p>
+            <h3>Download Started!</h3>
+            <p id="successFileTitle">Your high-definition media file is now transferring to your device.</p>
 
             <div class="success-actions">
-                <a id="downloadFinalBtn" href="#" class="btn-save-file">
+                <a id="downloadFinalBtn" href="#" class="btn-save-file" download>
                     <i class="fa-solid fa-cloud-arrow-down"></i>
-                    <span>DOWNLOAD READY</span>
+                    <span>DOWNLOAD AGAIN</span>
                 </a>
                 <button type="button" id="resetDownloadBtn" class="btn-reset">
                     Download Another
@@ -387,7 +387,7 @@
             </div>
             <p
                 style="font-size: 11px; color: var(--swatch-5); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 20px;">
-                Auto-purge enabled. Temporary file expires in 180 seconds.
+                Temporary file preserved for 1 hour to allow resume &amp; multi-stream transfer.
             </p>
         </section>
 
@@ -970,7 +970,7 @@
                             const percent = Math.min(Math.max(data.progress || 0, 0), 100);
                             progressBar.style.width = `${percent}%`;
                             progressPercent.textContent = `${percent.toFixed(0)}%`;
-                            statusPillText.textContent = 'Downloading (32 Parallel CDN Streams)';
+                            statusPillText.textContent = 'Gathering & Assembling High-Speed Media Stream';
                             metricSpeed.textContent = data.speed || '-- MB/s';
                             metricDownloaded.textContent = `${data.downloaded || '0 MB'} / ${data.total_size || 'N/A'}`;
                             metricEta.textContent = data.eta ? `${data.eta} left` : 'Calculating...';
@@ -1006,12 +1006,26 @@
                 successCard.style.display = 'block';
                 successCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-                downloadFinalBtn.href = `/api/files/${taskId}`;
+                const downloadUrl = `/api/files/${taskId}`;
+                downloadFinalBtn.href = downloadUrl;
                 if (data.title) {
-                    document.getElementById('successFileTitle').textContent = data.title;
+                    document.getElementById('successFileTitle').textContent = `Transferring: ${data.title}`;
                 }
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalBtnHtml;
+
+                // Automatic seamless browser download trigger
+                const dl = document.createElement('a');
+                dl.href = downloadUrl;
+                dl.setAttribute('download', '');
+                dl.style.display = 'none';
+                document.body.appendChild(dl);
+                dl.click();
+                setTimeout(() => {
+                    if (dl.parentNode) {
+                        dl.parentNode.removeChild(dl);
+                    }
+                }, 1000);
             }
 
             function showError(msg) {
