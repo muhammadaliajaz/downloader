@@ -83,6 +83,7 @@ def cancel_download(task_id):
         return False
 
 def download_task(task_id, url, format_type, quality, download_dir):
+    job_start_time = time.time()
     _prune_cache()
     
     # Initialize Cancel Event
@@ -166,12 +167,17 @@ def download_task(task_id, url, format_type, quality, download_dir):
         if cancel_event.is_set() or os.path.exists(os.path.join(TASK_CACHE_DIR, f"{task_id}.cancel")):
             raise CancelledError("User requested cancellation")
 
-        # DoS Defense: Abort downloads exceeding 2 GB to protect server disk space
-        MAX_ALLOWED_BYTES = 2 * 1024 * 1024 * 1024 # 2 GB
+        # DoS Defense: Abort jobs exceeding maximum allowed duration (5 minutes)
+        MAX_JOB_DURATION = 300  # 5 minutes
+        if time.time() - job_start_time > MAX_JOB_DURATION:
+            raise CancelledError("Download exceeded the maximum allowed time limit of 5 minutes.")
+
+        # DoS Defense: Abort downloads exceeding 750 MB to protect server disk space
+        MAX_ALLOWED_BYTES = 750 * 1024 * 1024  # 750 MB
         dl_bytes = d.get('downloaded_bytes') or 0
         tot_bytes = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
         if dl_bytes > MAX_ALLOWED_BYTES or tot_bytes > MAX_ALLOWED_BYTES:
-            raise CancelledError("Download exceeded the maximum allowed size limit of 2 GB.")
+            raise CancelledError("Download exceeded the maximum allowed size limit of 750 MB.")
 
         ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
         
@@ -663,7 +669,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
             except Exception:
                 pass
         # Release server concurrency slot
-        release_concurrency_slot()
+        release_concurrency_slot(task_id)
         # Final cleanup of the event
         with CANCEL_LOCK:
             if task_id in CANCEL_EVENTS:

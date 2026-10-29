@@ -574,9 +574,15 @@ def trigger_download():
     client_ip = get_client_ip()
     allowed, retry_after = check_rate_limit(client_ip)
     if not allowed:
-        return jsonify({
+        resp = jsonify({
             'error': f'Rate limit exceeded. Please wait {retry_after} seconds before starting another download.'
-        }), 429
+        })
+        resp.status_code = 429
+        resp.headers['Retry-After'] = str(retry_after)
+        resp.headers['X-RateLimit-Limit'] = '10'
+        resp.headers['X-RateLimit-Remaining'] = '0'
+        resp.headers['X-RateLimit-Reset'] = str(retry_after)
+        return resp
 
     # 2. JSON Request Validation
     data = request.get_json(silent=True)
@@ -613,22 +619,29 @@ def trigger_download():
     if quality not in ALLOWED_QUALITIES:
         return jsonify({'error': 'Invalid quality parameter'}), 400
 
-    # 5. Server Concurrency Slots Check (Max 5 active concurrent downloads)
-    if not acquire_concurrency_slot():
-        return jsonify({
-            'error': 'Server is currently at maximum capacity. Please wait a moment and try again.'
-        }), 503
-
     task_id = str(uuid.uuid4())
+
+    # 5. Server Concurrency Slots Check (Shared multi-worker safe lock)
+    if not acquire_concurrency_slot(task_id):
+        resp = jsonify({
+            'error': 'Server is currently at maximum capacity. Please wait a moment and try again.'
+        })
+        resp.status_code = 503
+        resp.headers['Retry-After'] = '15'
+        resp.headers['X-Concurrency-Limit'] = '5'
+        return resp
     
     try:
         # Start download in a background worker thread
         start_download_thread(task_id, url, format_type, quality, DOWNLOADS_DIR)
     except Exception:
-        release_concurrency_slot()
+        release_concurrency_slot(task_id)
         return jsonify({'error': 'Failed to launch download thread'}), 500
 
-    return jsonify({'task_id': task_id})
+    resp = jsonify({'task_id': task_id})
+    resp.headers['X-RateLimit-Limit'] = '10'
+    resp.headers['X-Concurrency-Limit'] = '5'
+    return resp
 
 @app.route('/api/status/<task_id>')
 def status(task_id):

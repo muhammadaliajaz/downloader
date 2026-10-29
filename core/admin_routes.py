@@ -212,8 +212,8 @@ def login_2fa():
         is_valid = False
         used_backup = False
 
-        # 1. Try TOTP authenticator code (6 digits, +-2 min clock skew tolerance)
-        if verify_totp_code(user['mfa_secret'], code_input, window=4):
+        # 1. Try TOTP authenticator code (6 digits, ±30s clock skew tolerance)
+        if verify_totp_code(user['mfa_secret'], code_input, window=1):
             is_valid = True
         # 2. Try single-use backup scratch code (e.g. XXXX-XXXX)
         elif user['mfa_backup_codes']:
@@ -351,6 +351,7 @@ def database_backup():
 
 @admin_bp.route('/', strict_slashes=False)
 @login_required
+@admin_required
 def dashboard():
     """Admin dashboard with high-level statistics and recent articles."""
     conn = get_db_connection()
@@ -396,6 +397,7 @@ def dashboard():
 
 @admin_bp.route('/posts', strict_slashes=False)
 @login_required
+@admin_required
 def posts_list():
     """Articles management table with search, status filters, category filter, and pagination."""
     page = request.args.get('page', 1, type=int)
@@ -454,6 +456,7 @@ def posts_list():
 @admin_bp.route('/posts/new', methods=['GET', 'POST'], endpoint='post_new', strict_slashes=False)
 @admin_bp.route('/posts/new', methods=['GET', 'POST'], endpoint='post_create', strict_slashes=False)
 @login_required
+@admin_required
 def post_create():
     """Create a new article with rich-text editor, scheduling, and SEO meta drawer."""
     conn = get_db_connection()
@@ -575,6 +578,7 @@ def post_create():
 
 @admin_bp.route('/posts/<int:post_id>/edit', methods=['GET', 'POST'], strict_slashes=False)
 @login_required
+@admin_required
 def post_edit(post_id):
     """Edit existing article."""
     conn = get_db_connection()
@@ -708,6 +712,7 @@ def post_edit(post_id):
 
 @admin_bp.route('/posts/<int:post_id>/toggle-status', methods=['POST'])
 @login_required
+@admin_required
 def post_toggle_status(post_id):
     """Toggles article between draft and published."""
     if not validate_csrf_token(request.form.get('csrf_token', '')):
@@ -739,6 +744,7 @@ def post_toggle_status(post_id):
 
 @admin_bp.route('/posts/<int:post_id>/delete', methods=['POST'])
 @login_required
+@admin_required
 def post_delete(post_id):
     """Deletes an article."""
     if not validate_csrf_token(request.form.get('csrf_token', '')):
@@ -764,6 +770,7 @@ def post_delete(post_id):
 
 @admin_bp.route('/categories', methods=['GET', 'POST'], strict_slashes=False)
 @login_required
+@admin_required
 def categories():
     """List and create categories."""
     conn = get_db_connection()
@@ -807,6 +814,7 @@ def categories():
 
 @admin_bp.route('/categories/<int:cat_id>/delete', methods=['POST'])
 @login_required
+@admin_required
 def category_delete(cat_id):
     """Deletes a category."""
     if not validate_csrf_token(request.form.get('csrf_token', '')):
@@ -822,6 +830,7 @@ def category_delete(cat_id):
 
 @admin_bp.route('/tags', methods=['GET', 'POST'], strict_slashes=False)
 @login_required
+@admin_required
 def tags():
     """List and manage tags."""
     conn = get_db_connection()
@@ -854,6 +863,7 @@ def tags():
 
 @admin_bp.route('/tags/<int:tag_id>/delete', methods=['POST'])
 @login_required
+@admin_required
 def tag_delete(tag_id):
     """Deletes a tag."""
     if not validate_csrf_token(request.form.get('csrf_token', '')):
@@ -873,6 +883,7 @@ def tag_delete(tag_id):
 
 @admin_bp.route('/media', methods=['GET', 'POST'], strict_slashes=False)
 @login_required
+@admin_required
 def media_library():
     """Media management gallery with file upload and copy link."""
     conn = get_db_connection()
@@ -916,6 +927,7 @@ def media_library():
 
 @admin_bp.route('/api/upload', methods=['POST'])
 @login_required
+@admin_required
 def api_upload_media():
     """AJAX file upload endpoint for Quill editor drag & drop and image picker."""
     csrf_token = request.headers.get('X-CSRFToken') or request.form.get('csrf_token')
@@ -938,6 +950,7 @@ def api_upload_media():
 
 @admin_bp.route('/media/<int:media_id>/delete', methods=['POST'])
 @login_required
+@admin_required
 def media_delete(media_id):
     """Deletes media file from storage and database."""
     if not validate_csrf_token(request.form.get('csrf_token', '')):
@@ -966,6 +979,7 @@ def media_delete(media_id):
 
 @admin_bp.route('/settings', methods=['GET', 'POST'], strict_slashes=False)
 @login_required
+@admin_required
 def settings():
     """Website settings configuration."""
     conn = get_db_connection()
@@ -1006,6 +1020,7 @@ def settings():
 
 @admin_bp.route('/account', methods=['GET', 'POST'], strict_slashes=False)
 @login_required
+@admin_required
 def account():
     """Account Profile, Password Security, Session Invalidation & Audit Log."""
     current_usr = get_current_user()
@@ -1111,9 +1126,9 @@ def account():
             secret = request.form.get('secret', '').strip() or session.get('pending_2fa_secret', '')
             code = request.form.get('totp_code', '').strip()
 
-            # Forgiving +-3 minute clock tolerance window during setup
-            if not secret or not code or not verify_totp_code(secret, code, window=6):
-                log_audit_event('2FA_ACTIVATION_FAILED', f"Code verification failed for user '{current_usr['username']}'. Input: '{code}'. Server time: {datetime.now().strftime('%H:%M:%S')}", user_id=current_usr['id'], username=current_usr['username'], ip_address=request.remote_addr)
+            # Standard RFC 6238 ±30s clock tolerance window during setup
+            if not secret or not code or not verify_totp_code(secret, code, window=1):
+                log_audit_event('2FA_ACTIVATION_FAILED', f"TOTP verification failed during 2FA activation for user '{current_usr['username']}'", user_id=current_usr['id'], username=current_usr['username'], ip_address=request.remote_addr)
                 flash('Invalid 6-digit code. Please verify the code displayed in your authenticator app and try again. (Tip: Ensure your phone clock is set to Automatic Network Time).', 'error')
                 qr_uri = generate_qr_code_data_uri(secret_b32=secret, username=current_usr['username'], issuer="ARYPlusDownloader")
                 audit_logs = conn.execute("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 30").fetchall()

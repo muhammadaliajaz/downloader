@@ -5,6 +5,7 @@ import os
 import time
 import threading
 import socket
+import tempfile
 from contextlib import contextmanager
 from collections import defaultdict
 
@@ -51,21 +52,71 @@ def check_rate_limit(client_ip):
         IP_REQUEST_LOG[client_ip].append(now)
         return True, 0
 
-def acquire_concurrency_slot():
-    """Attempts to acquire an active download slot. Returns True if successful."""
+TASK_LOCK_DIR = os.path.join(tempfile.gettempdir(), 'ytdl_concurrency_locks')
+try:
+    os.makedirs(TASK_LOCK_DIR, exist_ok=True)
+except Exception:
+    pass
+
+def _prune_stale_concurrency_locks():
+    now = time.time()
+    try:
+        if os.path.isdir(TASK_LOCK_DIR):
+            for fname in os.listdir(TASK_LOCK_DIR):
+                if fname.endswith('.lock'):
+                    fpath = os.path.join(TASK_LOCK_DIR, fname)
+                    if os.path.isfile(fpath) and (now - os.path.getmtime(fpath) > 360):
+                        try:
+                            os.remove(fpath)
+                        except Exception:
+                            pass
+    except Exception:
+        pass
+
+def acquire_concurrency_slot(task_id: str = None) -> bool:
+    """
+    Attempts to acquire an active download slot.
+    Cross-worker & cross-instance safe: verifies both in-memory counter
+    and shared filesystem lock directory.
+    """
     global ACTIVE_DOWNLOADS_COUNT
     with ACTIVE_LOCK:
-        if ACTIVE_DOWNLOADS_COUNT >= MAX_CONCURRENT_DOWNLOADS:
+        _prune_stale_concurrency_locks()
+        
+        active_fs_locks = 0
+        try:
+            if os.path.isdir(TASK_LOCK_DIR):
+                active_fs_locks = len([f for f in os.listdir(TASK_LOCK_DIR) if f.endswith('.lock')])
+        except Exception:
+            active_fs_locks = 0
+
+        effective_count = max(ACTIVE_DOWNLOADS_COUNT, active_fs_locks)
+        if effective_count >= MAX_CONCURRENT_DOWNLOADS:
             return False
+
         ACTIVE_DOWNLOADS_COUNT += 1
+        if task_id:
+            try:
+                lock_file = os.path.join(TASK_LOCK_DIR, f"{task_id}.lock")
+                with open(lock_file, 'w', encoding='utf-8') as f:
+                    f.write(str(time.time()))
+            except Exception:
+                pass
         return True
 
-def release_concurrency_slot():
-    """Releases an active download slot."""
+def release_concurrency_slot(task_id: str = None):
+    """Releases an active download slot from in-memory and shared lock directory."""
     global ACTIVE_DOWNLOADS_COUNT
     with ACTIVE_LOCK:
         if ACTIVE_DOWNLOADS_COUNT > 0:
             ACTIVE_DOWNLOADS_COUNT -= 1
+        if task_id:
+            try:
+                lock_file = os.path.join(TASK_LOCK_DIR, f"{task_id}.lock")
+                if os.path.isfile(lock_file):
+                    os.remove(lock_file)
+            except Exception:
+                pass
 
 def is_prohibited_ip(ip):
     """

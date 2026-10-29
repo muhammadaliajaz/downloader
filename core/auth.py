@@ -218,7 +218,9 @@ def admin_required(f):
         if not is_authenticated():
             flash('Please log in to access this area.', 'warning')
             return redirect(url_for('admin.login', next=request.url))
-        if session.get('role') != 'admin':
+        u = get_current_user()
+        role = u['role'] if u else session.get('role')
+        if role != 'admin':
             abort(403)
         return f(*args, **kwargs)
     return decorated_function

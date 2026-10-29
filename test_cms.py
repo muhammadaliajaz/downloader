@@ -890,6 +890,72 @@ class TestSecureAdminAndCMS(unittest.TestCase):
             self.assertEqual(api_res.status_code, 400, f"Malformed URL {m_url} returned status {api_res.status_code}")
             self.assertIn('error', api_res.get_json())
 
+    def test_17_security_hardening_and_role_authorization(self):
+        """
+        Validates:
+        1. Role authorization: non-admin roles (editor/viewer) receive 403 Forbidden on privileged routes.
+        2. 2FA setup audit log does NOT leak entered TOTP authentication codes.
+        3. Rate-limiting headers on /api/download responses.
+        """
+        # 1. Create a non-admin user
+        from core.auth import hash_password
+        from core.db import get_db_connection
+        conn = get_db_connection()
+        conn.execute(
+            "INSERT INTO users (username, display_name, password_hash, email, role) VALUES (?, ?, ?, ?, ?)",
+            ('test_editor', 'Editor', hash_password('EditorPass1234!'), 'editor@example.com', 'editor')
+        )
+        conn.commit()
+        editor_row = conn.execute("SELECT id, username, email FROM users WHERE username = 'test_editor'").fetchone()
+        conn.close()
+
+        # Log in as non-admin editor
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = editor_row['id']
+            sess['username'] = editor_row['username']
+            sess['email'] = editor_row['email']
+            sess['role'] = 'editor'
+            sess['_csrf_token'] = 'test_token'
+
+        # Verify privileged routes reject non-admin with 403 Forbidden
+        privileged_endpoints = ['/admin/', '/admin/posts', '/admin/settings', '/admin/media', '/admin/categories']
+        for ep in privileged_endpoints:
+            res = self.client.get(ep)
+            self.assertEqual(res.status_code, 403, f"Non-admin gained access to {ep} with status {res.status_code}")
+
+        # 2. Verify failed 2FA code is NEVER leaked into audit_logs table
+        fake_secret = 'JBSWY3DPEHPK3PXP'
+        secret_code = '999888'
+        conn = get_db_connection()
+        admin_row = conn.execute("SELECT id, username FROM users WHERE role = 'admin' LIMIT 1").fetchone()
+        conn.close()
+        admin_id = admin_row['id'] if admin_row else 1
+        admin_name = admin_row['username'] if admin_row else 'admin'
+
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = admin_id
+            sess['username'] = admin_name
+            sess['role'] = 'admin'
+            sess['_csrf_token'] = 'test_token'
+
+        res = self.client.post('/admin/account', data={
+            'form_action': 'confirm_enable_2fa',
+            'secret': fake_secret,
+            'totp_code': secret_code,
+            'csrf_token': 'test_token'
+        })
+        # Check audit log in DB
+        conn = get_db_connection()
+        audit_rows = conn.execute("SELECT details FROM audit_logs WHERE action = '2FA_ACTIVATION_FAILED'").fetchall()
+        conn.close()
+        for row in audit_rows:
+            self.assertNotIn(secret_code, row['details'], "Entered 2FA TOTP code was found in audit log details!")
+
+        # 3. Verify /api/download returns security and concurrency headers
+        api_res = self.client.post('/api/download', json={'url': 'https://www.youtube.com/watch?v=aqz-KE-bpKQ', 'format': 'mp4', 'quality': '720', 'csrf_token': 'test_token'})
+        self.assertIn('X-Concurrency-Limit', api_res.headers)
+        self.assertEqual(api_res.headers.get('X-Concurrency-Limit'), '5')
+
 if __name__ == '__main__':
     unittest.main()
 

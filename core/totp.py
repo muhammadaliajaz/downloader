@@ -33,11 +33,11 @@ def get_totp_code(secret_b32: str, current_time: float = None, interval: int = 3
     code = (struct.unpack('>I', digest[offset:offset+4])[0] & 0x7fffffff) % 1000000
     return f"{code:06d}"
 
-def verify_totp_code(secret_b32: str, code_input: str, interval: int = 30, window: int = 2) -> bool:
+def verify_totp_code(secret_b32: str, code_input: str, interval: int = 30, window: int = 1) -> bool:
     """
-    Verifies submitted 6-digit code against TOTP algorithm with clock drift tolerance.
-    Window of 2 checks [current - 60s, current - 30s, current, current + 30s, current + 60s]
-    to prevent false rejections due to minor mobile or server clock skew.
+    Verifies submitted 6-digit code against TOTP algorithm with standard RFC 6238 clock drift tolerance.
+    Window of 1 checks [current - 30s, current, current + 30s] (±1 interval)
+    to balance security against replay windows while allowing standard device clock skew.
     """
     if not secret_b32 or not code_input:
         return False
