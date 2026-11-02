@@ -308,12 +308,12 @@ def apply_security_headers(response):
     nonce_script = f"'nonce-{nonce}' " if nonce else ""
     csp_directives = [
         "default-src 'self'",
-        f"script-src 'self' {nonce_script}https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
+        f"script-src 'self' {nonce_script}https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://www.googletagmanager.com",
         "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://cdn.jsdelivr.net",
         "font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com data:",
         "img-src 'self' data: https: blob:",
         "media-src 'self' blob: https:",
-        "connect-src 'self'",
+        "connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://*.google-analytics.com https://*.googletagmanager.com",
         "object-src 'none'",
         "base-uri 'self'",
         "form-action 'self'",
