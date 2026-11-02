@@ -426,3 +426,18 @@ Disallow: /downloads/
 Sitemap: {site_url}/sitemap.xml
 """
     return Response(content, mimetype='text/plain')
+
+@blog_bp.route('/ads.txt')
+def ads_txt():
+    """Authorized Digital Sellers (ads.txt) verification for Google AdSense."""
+    content = get_setting('ads_txt')
+    if not content or not content.strip():
+        ads_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'ads.txt')
+        if os.path.isfile(ads_file):
+            with open(ads_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+        else:
+            content = "google.com, pub-8761031737616570, DIRECT, f08c47fec0942fa0\n"
+    res = Response(content, mimetype='text/plain')
+    res.headers['Cache-Control'] = 'public, max-age=86400'
+    return res

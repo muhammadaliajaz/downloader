@@ -35,11 +35,16 @@ class TestSecureAdminAndCMS(unittest.TestCase):
             '/terms/',
             '/disclaimer/',
             '/robots.txt',
-            '/sitemap.xml'
+            '/sitemap.xml',
+            '/ads.txt'
         ]
         for route in routes:
             res = self.client.get(route)
             self.assertEqual(res.status_code, 200, f"Route {route} failed with status {res.status_code}")
+
+        # Verify ads.txt contains publisher ID
+        ads_res = self.client.get('/ads.txt')
+        self.assertIn('pub-8761031737616570', ads_res.data.decode('utf-8'))
 
     def test_02_html_sanitization(self):
         """Verify rich-text sanitizer strips malicious XSS payload while preserving safe tags."""
