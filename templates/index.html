@@ -138,7 +138,7 @@
 
     <!-- Font Awesome & Design System Stylesheet -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20261024_6">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20261111_turbo">
 </head>
 
 <body>
@@ -391,13 +391,54 @@
             <h3>Extraction Complete!</h3>
             <p id="successFileTitle">Your high-definition media file is ready for download.</p>
 
-            <div class="success-actions">
-                <a id="downloadFinalBtn" href="#" class="btn-save-file" download>
-                    <i class="fa-solid fa-cloud-arrow-down"></i>
-                    <span>DOWNLOAD READY</span>
-                </a>
+            <!-- Turbo Multi-Stream Accelerator UI -->
+            <div id="turboDownloadContainer" class="turbo-box">
+                <div class="turbo-badge">
+                    <span class="pulse-dot"></span>
+                    <span>ULTRA-FAST MULTI-STREAM ACCELERATOR (6x PIPELINE)</span>
+                </div>
+
+                <!-- Live Progress Display -->
+                <div id="turboProgressWrap" class="turbo-progress-wrap" style="display: none;">
+                    <div class="turbo-metric-row">
+                        <div class="turbo-speed">
+                            <i class="fa-solid fa-bolt-lightning"></i>
+                            <span id="turboSpeed">Connecting sockets...</span>
+                        </div>
+                        <div class="turbo-eta">
+                            <span id="turboEta">Calculating ETA...</span>
+                        </div>
+                    </div>
+
+                    <div class="turbo-track">
+                        <div id="turboBar" class="turbo-bar" style="width: 0%;"></div>
+                    </div>
+
+                    <div class="turbo-submetric-row">
+                        <span id="turboBytes">0 MB / 0 MB</span>
+                        <span id="turboPercent">0%</span>
+                    </div>
+
+                    <div id="turboStatus" class="turbo-status-label">
+                        <i class="fa-solid fa-network-wired"></i> 6 Parallel Streams Active — Saturating Connection
+                    </div>
+                </div>
+
+                <div class="turbo-actions">
+                    <button type="button" id="btnTurboDownload" class="btn-turbo-start">
+                        <i class="fa-solid fa-bolt-lightning"></i>
+                        <span>START TURBO DOWNLOAD (6x SPEED)</span>
+                    </button>
+                    <a id="downloadFinalBtn" href="#" class="btn-direct-link" download>
+                        <i class="fa-solid fa-cloud-arrow-down"></i>
+                        <span>Direct / IDM Link</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="success-actions" style="margin-top: 18px;">
                 <button type="button" id="resetDownloadBtn" class="btn-reset">
-                    Download Another
+                    <i class="fa-solid fa-rotate-left"></i> Download Another Video
                 </button>
             </div>
             <p
@@ -868,12 +909,22 @@
             const successCard = document.getElementById('successCard');
             const downloadFinalBtn = document.getElementById('downloadFinalBtn');
             const resetDownloadBtn = document.getElementById('resetDownloadBtn');
+            const btnTurboDownload = document.getElementById('btnTurboDownload');
+            const turboProgressWrap = document.getElementById('turboProgressWrap');
+            const turboSpeed = document.getElementById('turboSpeed');
+            const turboEta = document.getElementById('turboEta');
+            const turboBar = document.getElementById('turboBar');
+            const turboBytes = document.getElementById('turboBytes');
+            const turboPercent = document.getElementById('turboPercent');
+            const turboStatus = document.getElementById('turboStatus');
             const errorCard = document.getElementById('errorCard');
             const errorMessage = document.getElementById('errorMessage');
 
             let selectedFormat = 'mp4';
             let activeTaskId = null;
             let currentEventSource = null;
+            let turboAbortController = null;
+            let turboSpeedInterval = null;
             const originalBtnHtml = submitBtn.innerHTML;
 
             // Format toggles
@@ -1016,20 +1067,210 @@
                 };
             }
 
+            async function runTurboDownload(taskId, rawTitle) {
+                if (!taskId) return;
+
+                if (turboAbortController) {
+                    turboAbortController.abort();
+                }
+                if (turboSpeedInterval) {
+                    clearInterval(turboSpeedInterval);
+                    turboSpeedInterval = null;
+                }
+                turboAbortController = new AbortController();
+                const signal = turboAbortController.signal;
+
+                turboProgressWrap.style.display = 'block';
+                btnTurboDownload.disabled = true;
+                btnTurboDownload.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>DOWNLOADING (6 STREAMS)...</span>`;
+                turboSpeed.innerHTML = `<strong>Connecting 6 Sockets...</strong>`;
+                turboEta.textContent = 'Estimating...';
+                turboBar.style.width = '3%';
+                turboBytes.textContent = '0 MB';
+                turboPercent.textContent = '0%';
+                turboStatus.innerHTML = `<i class="fa-solid fa-network-wired"></i> Establishing 6 parallel byte-range streams...`;
+
+                const fileUrl = `/api/files/${taskId}`;
+
+                try {
+                    // 1. Probe headers to get Content-Length & Accept-Ranges
+                    const headRes = await fetch(fileUrl, { method: 'HEAD', signal });
+                    if (!headRes.ok) throw new Error('HEAD probe failed with ' + headRes.status);
+
+                    const contentLengthHeader = headRes.headers.get('Content-Length');
+                    const totalBytes = contentLengthHeader ? parseInt(contentLengthHeader, 10) : 0;
+
+                    // If file is very small (< 2MB) or huge (> 750MB), or ranges unsupported, trigger direct download
+                    if (!totalBytes || totalBytes < 2 * 1024 * 1024 || totalBytes > 750 * 1024 * 1024 || !window.ReadableStream) {
+                        turboStatus.innerHTML = `<i class="fa-solid fa-circle-check"></i> Standard high-speed direct stream active.`;
+                        downloadFinalBtn.click();
+                        btnTurboDownload.disabled = false;
+                        btnTurboDownload.innerHTML = `<i class="fa-solid fa-check"></i> <span>DOWNLOAD READY</span>`;
+                        return;
+                    }
+
+                    // 2. Concurrency calculation (6 streams for maximum transatlantic BDP saturation)
+                    const CONCURRENCY = totalBytes >= 20 * 1024 * 1024 ? 6 : 4;
+                    const chunkSize = Math.ceil(totalBytes / CONCURRENCY);
+                    const ranges = [];
+                    for (let i = 0; i < CONCURRENCY; i++) {
+                        const start = i * chunkSize;
+                        const end = Math.min(start + chunkSize - 1, totalBytes - 1);
+                        if (start <= end) {
+                            ranges.push({ index: i, start, end, size: end - start + 1 });
+                        }
+                    }
+
+                    turboStatus.innerHTML = `<i class="fa-solid fa-bolt-lightning" style="color:#10b981;"></i> ${ranges.length} Parallel Streams Active — Transatlantic Latency Bypassed`;
+
+                    const streamProgress = new Array(ranges.length).fill(0);
+                    const streamBlobs = new Array(ranges.length);
+
+                    let lastTimestamp = performance.now();
+                    let lastBytesTotal = 0;
+
+                    turboSpeedInterval = setInterval(() => {
+                        const now = performance.now();
+                        const timeDeltaSec = (now - lastTimestamp) / 1000;
+                        const currentLoaded = streamProgress.reduce((a, b) => a + b, 0);
+                        const bytesDelta = currentLoaded - lastBytesTotal;
+
+                        if (timeDeltaSec >= 0.25) {
+                            const speedBytesPerSec = bytesDelta / timeDeltaSec;
+                            const speedMbps = (speedBytesPerSec / (1024 * 1024)).toFixed(1);
+                            turboSpeed.innerHTML = `<strong>${speedMbps} MB/s</strong> (${ranges.length} Streams)`;
+
+                            const percent = Math.min(99, Math.floor((currentLoaded / totalBytes) * 100));
+                            turboBar.style.width = `${percent}%`;
+                            turboPercent.textContent = `${percent}%`;
+
+                            const loadedMB = (currentLoaded / (1024 * 1024)).toFixed(1);
+                            const totalMB = (totalBytes / (1024 * 1024)).toFixed(1);
+                            turboBytes.textContent = `${loadedMB} MB / ${totalMB} MB`;
+
+                            if (speedBytesPerSec > 50000) {
+                                const remainingBytes = totalBytes - currentLoaded;
+                                const etaSec = Math.max(1, Math.round(remainingBytes / speedBytesPerSec));
+                                turboEta.textContent = `ETA: ${etaSec}s`;
+                            }
+
+                            lastTimestamp = now;
+                            lastBytesTotal = currentLoaded;
+                        }
+                    }, 300);
+
+                    // 3. Worker function for each segment
+                    async function fetchSegment(r, idx) {
+                        const res = await fetch(fileUrl, {
+                            headers: {
+                                'Range': `bytes=${r.start}-${r.end}`,
+                                'Accept': '*/*'
+                            },
+                            signal
+                        });
+
+                        if (res.status !== 206 && res.status !== 200) {
+                            throw new Error(`Stream ${idx} returned HTTP ${res.status}`);
+                        }
+
+                        if (!res.body || !res.body.getReader) {
+                            const blob = await res.blob();
+                            streamProgress[idx] = blob.size;
+                            streamBlobs[idx] = blob;
+                            return;
+                        }
+
+                        const reader = res.body.getReader();
+                        const chunks = [];
+                        let received = 0;
+
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+                            chunks.push(value);
+                            received += value.length;
+                            streamProgress[idx] = received;
+                        }
+
+                        streamBlobs[idx] = new Blob(chunks);
+                    }
+
+                    // 4. Run all streams in parallel!
+                    await Promise.all(ranges.map((r, i) => fetchSegment(r, i)));
+
+                    if (turboSpeedInterval) {
+                        clearInterval(turboSpeedInterval);
+                        turboSpeedInterval = null;
+                    }
+
+                    // 5. Assemble all chunks into final Blob
+                    turboBar.style.width = '100%';
+                    turboPercent.textContent = '100%';
+                    const totalMB = (totalBytes / (1024 * 1024)).toFixed(1);
+                    turboBytes.textContent = `${totalMB} MB / ${totalMB} MB`;
+                    turboSpeed.innerHTML = `<span style="color:#10b981;">⚡ Fully Downloaded!</span>`;
+                    turboEta.textContent = 'Done';
+                    turboStatus.innerHTML = `<i class="fa-solid fa-circle-check" style="color:#10b981;"></i> All streams merged successfully! Saving to your device...`;
+
+                    const finalMime = selectedFormat === 'mp3' ? 'audio/mpeg' : 'video/mp4';
+                    const finalBlob = new Blob(streamBlobs, { type: finalMime });
+                    
+                    let downloadName = (rawTitle || 'video').replace(/[\\/*?:"<>|]/g, '').trim().substring(0, 80) || 'video';
+                    if (!downloadName.toLowerCase().endsWith('.mp4') && !downloadName.toLowerCase().endsWith('.mp3')) {
+                        downloadName += selectedFormat === 'mp3' ? '.mp3' : '.mp4';
+                    }
+
+                    const blobUrl = URL.createObjectURL(finalBlob);
+                    const tempA = document.createElement('a');
+                    tempA.href = blobUrl;
+                    tempA.download = downloadName;
+                    document.body.appendChild(tempA);
+                    tempA.click();
+                    document.body.removeChild(tempA);
+
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 120000);
+
+                    btnTurboDownload.disabled = false;
+                    btnTurboDownload.innerHTML = `<i class="fa-solid fa-circle-check"></i> <span>DOWNLOAD COMPLETED</span>`;
+                    turboStatus.innerHTML = `<i class="fa-solid fa-circle-check" style="color:#10b981;"></i> Saved at line-rate speed to your Downloads folder!`;
+
+                } catch (err) {
+                    if (turboSpeedInterval) {
+                        clearInterval(turboSpeedInterval);
+                        turboSpeedInterval = null;
+                    }
+                    if (err.name === 'AbortError') return;
+                    console.warn('Turbo download error, falling back to direct link:', err);
+                    turboStatus.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b;"></i> Multi-stream error. Triggering direct download link...`;
+                    downloadFinalBtn.click();
+                    btnTurboDownload.disabled = false;
+                    btnTurboDownload.innerHTML = `<i class="fa-solid fa-bolt-lightning"></i> <span>RETRY TURBO DOWNLOAD</span>`;
+                }
+            }
+
+            btnTurboDownload.addEventListener('click', () => {
+                if (activeTaskId) {
+                    const titleText = document.getElementById('successFileTitle').textContent || 'video';
+                    runTurboDownload(activeTaskId, titleText);
+                }
+            });
+
             function handleComplete(taskId, data) {
                 dashboardCard.style.display = 'none';
                 successCard.style.display = 'block';
                 successCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
                 downloadFinalBtn.href = `/api/files/${taskId}`;
+                const titleText = data.title || 'video';
                 if (data.title) {
                     document.getElementById('successFileTitle').textContent = data.title;
                 }
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalBtnHtml;
 
+                // Auto-start Turbo Multi-Stream accelerator
                 setTimeout(() => {
-                    try { downloadFinalBtn.click(); } catch(e) {}
+                    runTurboDownload(taskId, titleText);
                 }, 350);
             }
 
@@ -1063,6 +1304,14 @@
             });
 
             resetDownloadBtn.addEventListener('click', () => {
+                if (turboAbortController) {
+                    turboAbortController.abort();
+                    turboAbortController = null;
+                }
+                if (turboSpeedInterval) {
+                    clearInterval(turboSpeedInterval);
+                    turboSpeedInterval = null;
+                }
                 successCard.style.display = 'none';
                 urlInput.value = '';
                 urlInput.focus();

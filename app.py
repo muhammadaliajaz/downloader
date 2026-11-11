@@ -723,8 +723,17 @@ def cancel(task_id):
         return jsonify({'status': 'success', 'message': 'Download cancellation signal sent'})
     return jsonify({'status': 'error', 'message': 'Task not found or already completed'}), 404
 
-@app.route('/api/files/<task_id>')
+@app.route('/api/files/<task_id>', methods=['GET', 'HEAD', 'OPTIONS'])
 def download_file(task_id):
+    if request.method == 'OPTIONS':
+        resp = Response()
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        resp.headers['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS'
+        resp.headers['Access-Control-Allow-Headers'] = 'Range, Content-Type, Accept'
+        resp.headers['Access-Control-Expose-Headers'] = 'Content-Length, Content-Range, Accept-Ranges, Content-Disposition'
+        resp.headers['Access-Control-Max-Age'] = '86400'
+        return resp
+
     # Security: Strict UUID format validation
     try:
         uuid.UUID(task_id)
@@ -749,22 +758,22 @@ def download_file(task_id):
 
     # Clean download name for the user's browser
     raw_title = progress_data.get('title') or 'video'
-    import re
     clean_title = re.sub(r'[\\/*?:"<>|]', "", raw_title).strip() or "video"
     clean_title = re.sub(r'\s+', ' ', clean_title)[:80]
     _, ext = os.path.splitext(file_path)
     clean_download_name = f"{clean_title}{ext}"
 
-    # Background auto-delete after 1 hour grace period to free disk space (never delete active downloads)
-    def secure_delete():
-        time.sleep(3600)
-        try:
-            if os.path.isfile(file_path):
-                os.remove(file_path)
-        except Exception:
-            pass
-                
-    threading.Thread(target=secure_delete, daemon=True).start()
+    # Background auto-delete after 1 hour grace period (scheduled once per task)
+    if not progress_data.get('_cleanup_scheduled'):
+        progress_data['_cleanup_scheduled'] = True
+        def secure_delete():
+            time.sleep(3600)
+            try:
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+            except Exception:
+                pass
+        threading.Thread(target=secure_delete, daemon=True).start()
 
     MEDIA_MIMETYPES = {
         '.mp4': 'video/mp4',
@@ -787,12 +796,19 @@ def download_file(task_id):
         conditional=True,
         max_age=86400
     )
-    if hasattr(response.response, 'buffer_size'):
-        response.response.buffer_size = 4 * 1024 * 1024  # 4MB chunk buffer for high-throughput socket saturation
+    # Ensure both Werkzeug buffer_size and Gunicorn blksize use 4MB blocks to maximize socket throughput
+    for attr in ('buffer_size', 'blksize'):
+        if hasattr(response.response, attr):
+            setattr(response.response, attr, 4 * 1024 * 1024)
+
     safe_ascii_name = clean_download_name.encode('ascii', 'ignore').decode('ascii') or 'video.mp4'
     quoted_name = urllib.parse.quote(clean_download_name)
     response.headers['Content-Disposition'] = f'attachment; filename="{safe_ascii_name}"; filename*=UTF-8\'\'{quoted_name}'
     response.headers['Accept-Ranges'] = 'bytes'
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Range, Content-Type, Accept'
+    response.headers['Access-Control-Expose-Headers'] = 'Content-Length, Content-Range, Accept-Ranges, Content-Disposition'
     response.headers['Cache-Control'] = 'public, max-age=86400, no-transform'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['Connection'] = 'keep-alive'
