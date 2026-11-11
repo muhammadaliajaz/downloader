@@ -787,33 +787,97 @@ def download_file(task_id):
     }
     mimetype = MEDIA_MIMETYPES.get(ext.lower(), 'application/octet-stream')
 
-    # High-Performance Linux Zero-Copy Streaming via send_file (activates os.sendfile in Gunicorn)
-    response = send_file(
-        file_path,
-        as_attachment=True,
-        download_name=clean_download_name,
-        mimetype=mimetype,
-        conditional=True,
-        max_age=86400
-    )
-    # Ensure both Werkzeug buffer_size and Gunicorn blksize use 4MB blocks to maximize socket throughput
-    for attr in ('buffer_size', 'blksize'):
-        if hasattr(response.response, attr):
-            setattr(response.response, attr, 4 * 1024 * 1024)
-
+    file_size = os.path.getsize(file_path)
     safe_ascii_name = clean_download_name.encode('ascii', 'ignore').decode('ascii') or 'video.mp4'
     quoted_name = urllib.parse.quote(clean_download_name)
-    response.headers['Content-Disposition'] = f'attachment; filename="{safe_ascii_name}"; filename*=UTF-8\'\'{quoted_name}'
-    response.headers['Accept-Ranges'] = 'bytes'
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Range, Content-Type, Accept'
-    response.headers['Access-Control-Expose-Headers'] = 'Content-Length, Content-Range, Accept-Ranges, Content-Disposition'
-    response.headers['Cache-Control'] = 'public, max-age=86400, no-transform'
-    response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['Connection'] = 'keep-alive'
-    response.headers['Keep-Alive'] = 'timeout=65, max=1000'
-    return response
+    content_disp = f'attachment; filename="{safe_ascii_name}"; filename*=UTF-8\'\'{quoted_name}'
+
+    # High-Performance 4MB Streaming Buffer: Bypasses Python/Gunicorn 8KB default chunk bottleneck
+    CHUNK_SIZE = 4 * 1024 * 1024  # 4 MB blocks saturate gigabit sockets immediately
+
+    range_header = request.headers.get('Range', None)
+    if range_header and range_header.startswith('bytes='):
+        try:
+            range_spec = range_header.split('=', 1)[1].strip()
+            range_val = range_spec.split(',')[0].strip()
+            start_str, end_str = range_val.split('-', 1)
+            
+            if start_str and end_str:
+                start = int(start_str)
+                end = min(int(end_str), file_size - 1)
+            elif start_str:
+                start = int(start_str)
+                end = file_size - 1
+            elif end_str:
+                suffix_len = int(end_str)
+                start = max(0, file_size - suffix_len)
+                end = file_size - 1
+            else:
+                start = 0
+                end = file_size - 1
+
+            if start >= file_size or start > end:
+                resp = Response(status=416)
+                resp.headers['Content-Range'] = f'bytes */{file_size}'
+                return resp
+
+            length = end - start + 1
+
+            def stream_range():
+                with open(file_path, 'rb') as f:
+                    f.seek(start)
+                    remaining = length
+                    while remaining > 0:
+                        read_len = min(remaining, CHUNK_SIZE)
+                        data = f.read(read_len)
+                        if not data:
+                            break
+                        remaining -= len(data)
+                        yield data
+
+            resp = Response(
+                stream_range(),
+                status=206,
+                mimetype=mimetype,
+                direct_passthrough=True
+            )
+            resp.headers['Content-Range'] = f'bytes {start}-{end}/{file_size}'
+            resp.headers['Content-Length'] = str(length)
+        except Exception:
+            range_header = None
+
+    if not range_header or not range_header.startswith('bytes='):
+        if request.method == 'HEAD':
+            resp = Response(status=200, mimetype=mimetype)
+            resp.headers['Content-Length'] = str(file_size)
+        else:
+            def stream_full():
+                with open(file_path, 'rb') as f:
+                    while True:
+                        data = f.read(CHUNK_SIZE)
+                        if not data:
+                            break
+                        yield data
+
+            resp = Response(
+                stream_full(),
+                status=200,
+                mimetype=mimetype,
+                direct_passthrough=True
+            )
+            resp.headers['Content-Length'] = str(file_size)
+
+    resp.headers['Content-Disposition'] = content_disp
+    resp.headers['Accept-Ranges'] = 'bytes'
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS'
+    resp.headers['Access-Control-Allow-Headers'] = 'Range, Content-Type, Accept'
+    resp.headers['Access-Control-Expose-Headers'] = 'Content-Length, Content-Range, Accept-Ranges, Content-Disposition'
+    resp.headers['Cache-Control'] = 'public, max-age=86400, no-transform'
+    resp.headers['X-Content-Type-Options'] = 'nosniff'
+    resp.headers['Connection'] = 'keep-alive'
+    resp.headers['Keep-Alive'] = 'timeout=65, max=1000'
+    return resp
 
 if __name__ == '__main__':
     # Production security: debug mode disabled

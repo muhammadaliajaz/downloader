@@ -425,15 +425,18 @@
                 </div>
 
                 <div class="turbo-actions">
-                    <button type="button" id="btnTurboDownload" class="btn-turbo-start">
-                        <i class="fa-solid fa-bolt-lightning"></i>
-                        <span>START TURBO DOWNLOAD (6x SPEED)</span>
-                    </button>
-                    <a id="downloadFinalBtn" href="#" class="btn-direct-link" download>
+                    <a id="downloadFinalBtn" href="#" class="btn-turbo-start" download>
                         <i class="fa-solid fa-cloud-arrow-down"></i>
-                        <span>Direct / IDM Link</span>
+                        <span>DOWNLOAD FILE (INSTANT STREAM)</span>
                     </a>
+                    <button type="button" id="btnTurboDownload" class="btn-direct-link">
+                        <i class="fa-solid fa-bolt-lightning"></i>
+                        <span>Multi-Socket Booster (6x)</span>
+                    </button>
                 </div>
+                <p id="downloadNoticeText" style="font-size: 12px; color: #34d399; margin: 12px 0 0; font-weight: 600;">
+                    <i class="fa-solid fa-circle-check"></i> Direct high-speed download started automatically! If it did not start, click the button above.
+                </p>
             </div>
 
             <div class="success-actions" style="margin-top: 18px;">
@@ -1268,10 +1271,12 @@
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalBtnHtml;
 
-                // Auto-start Turbo Multi-Stream accelerator
+                // Instant Native Direct Download Trigger (streams 4MB kernel chunks straight to disk)
                 setTimeout(() => {
-                    runTurboDownload(taskId, titleText);
-                }, 350);
+                    try {
+                        downloadFinalBtn.click();
+                    } catch(e) {}
+                }, 300);
             }
 
             function showError(msg) {
