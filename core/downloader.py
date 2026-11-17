@@ -317,6 +317,9 @@ def download_task(task_id, url, format_type, quality, download_dir):
     if is_ary:
         # ARY Plus is native HLS (.m3u8). Parallel fragment streams saturate CDN bandwidth
         ydl_opts.pop('http_chunk_size', None)
+        ydl_opts.pop('remote_components', None)
+        ydl_opts.pop('js_runtimes', None)
+        ydl_opts.pop('extractor_args', None)
         ydl_opts['http_headers'] = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://aryplus.tv/',
@@ -661,7 +664,10 @@ def download_task(task_id, url, format_type, quality, download_dir):
                 except:
                     pass
     except Exception as e:
+        import traceback
+        full_tb = traceback.format_exc()
         err_msg = str(e)
+        logger.error(f"Download failed for task {task_id}: {err_msg}\n{full_tb}")
         # Security: Mask internal server directory paths from error messages
         err_msg = re.sub(r'[A-Za-z]:\\[^\s<]+', '[Server Path]', err_msg)
         err_msg = re.sub(r'/(?:[a-zA-Z0-9_\-\.]+/)+[a-zA-Z0-9_\-\.]+', '[Server Path]', err_msg)
@@ -678,6 +684,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
             PROGRESS_CACHE[task_id] = {
                 'status': 'error', 
                 'error': err_msg,
+                'full_traceback': full_tb,
                 'timestamp': time.time()
             }
             _save_task_cache(task_id, PROGRESS_CACHE[task_id])

@@ -523,6 +523,30 @@ def test_ary():
         import traceback
         return jsonify({'status': 'error', 'error': str(e), 'traceback': traceback.format_exc()}), 500
 
+@app.route('/api/test_download')
+def test_download():
+    import traceback
+    import tempfile
+    from core.downloader import download_task, PROGRESS_CACHE
+    task_id = 'test_diag_' + str(int(time.time()))
+    url = request.args.get('url', 'https://aryplus.tv/video/v2/3/6afb09b94802cce952b563dd/6aabeb956ff05a2ba20dc641')
+    download_dir = tempfile.gettempdir()
+    try:
+        download_task(task_id, url, 'mp4', '720', download_dir)
+        return jsonify({
+            'status': 'finished',
+            'task_id': task_id,
+            'cache': PROGRESS_CACHE.get(task_id)
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'task_id': task_id,
+            'cache': PROGRESS_CACHE.get(task_id),
+            'exception': str(e),
+            'traceback': traceback.format_exc()
+        })
+
 @app.route('/api/debug_ytdlp')
 def debug_ytdlp():
     """Diagnostic tool accessible with admin session or secure debug key."""
