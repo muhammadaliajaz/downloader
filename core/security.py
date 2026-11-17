@@ -18,7 +18,7 @@ MAX_REQUESTS_PER_MINUTE = 10
 WINDOW_SECONDS = 60
 
 # Max server-wide active concurrent downloads (prevents DoS RAM exhaustion)
-MAX_CONCURRENT_DOWNLOADS = 5
+MAX_CONCURRENT_DOWNLOADS = 15
 ACTIVE_DOWNLOADS_COUNT = 0
 ACTIVE_LOCK = threading.Lock()
 
@@ -58,14 +58,42 @@ try:
 except Exception:
     pass
 
+def reset_concurrency_locks():
+    """Clear all stale locks on startup."""
+    try:
+        if os.path.isdir(TASK_LOCK_DIR):
+            for fname in os.listdir(TASK_LOCK_DIR):
+                if fname.endswith('.lock'):
+                    try:
+                        os.remove(os.path.join(TASK_LOCK_DIR, fname))
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
+# Clear orphaned locks from previous runs on module load
+reset_concurrency_locks()
+
 def _prune_stale_concurrency_locks():
     now = time.time()
+    task_cache_dir = os.path.join(tempfile.gettempdir(), 'ytdl_task_cache')
     try:
         if os.path.isdir(TASK_LOCK_DIR):
             for fname in os.listdir(TASK_LOCK_DIR):
                 if fname.endswith('.lock'):
                     fpath = os.path.join(TASK_LOCK_DIR, fname)
-                    if os.path.isfile(fpath) and (now - os.path.getmtime(fpath) > 360):
+                    tid = fname[:-5]
+                    is_done = False
+                    cache_file = os.path.join(task_cache_dir, f"{tid}.json")
+                    if os.path.isfile(cache_file):
+                        try:
+                            with open(cache_file, 'r', encoding='utf-8') as cf:
+                                cdata = json.load(cf)
+                                if cdata.get('status') in ['finished', 'error', 'cancelled']:
+                                    is_done = True
+                        except Exception:
+                            pass
+                    if is_done or (now - os.path.getmtime(fpath) > 60):
                         try:
                             os.remove(fpath)
                         except Exception:

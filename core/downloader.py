@@ -710,8 +710,11 @@ def start_download_thread(task_id, url, format_type, quality, download_dir):
         _save_task_cache(task_id, PROGRESS_CACHE[task_id])
 
     def _guarded_worker():
-        with ssrf_safe_socket():
-            download_task(task_id, url, format_type, quality, download_dir)
+        try:
+            with ssrf_safe_socket():
+                download_task(task_id, url, format_type, quality, download_dir)
+        finally:
+            release_concurrency_slot(task_id)
 
     thread = threading.Thread(target=_guarded_worker)
     thread.daemon = True
