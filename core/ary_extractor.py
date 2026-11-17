@@ -10,17 +10,14 @@ ARY_API_BASE = "https://be.aryplus.tv/api"
 
 DEFAULT_ARY_API_KEY = "ak_37515186786306625012043079404171"
 _CACHED_ARY_KEY = None
-_ARY_KEY_LOCK = threading.Lock()
 
 def get_ary_api_key() -> str:
     """
     Safely resolves the ARY Plus API key:
     1. Checks ARY_API_KEY environment variable.
     2. Checks database settings for 'ary_api_key'.
-    3. If not configured, dynamically discovers the public key from the aryplus.tv client bundle.
-    4. Falls back to known production key if cloud/datacenter IP is blocked from scraping client bundle.
+    3. Falls back immediately to the verified production key with zero latency.
     """
-    global _CACHED_ARY_KEY
     env_key = os.environ.get('ARY_API_KEY')
     if env_key and env_key.strip():
         return env_key.strip()
@@ -33,23 +30,7 @@ def get_ary_api_key() -> str:
     except Exception:
         pass
 
-    with _ARY_KEY_LOCK:
-        if _CACHED_ARY_KEY:
-            return _CACHED_ARY_KEY
-        try:
-            r = requests.get('https://aryplus.tv/', headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}, timeout=6)
-            scripts = re.findall(r'<script[^>]+src=[\x22\x27]([^\x22\x27]+\.js[^\x22\x27]*)[\x22\x27]', r.text)
-            for s in scripts:
-                url = s if s.startswith('http') else ('https://aryplus.tv' + ('/' if not s.startswith('/') else '') + s)
-                sr = requests.get(url, timeout=6)
-                m = re.search(r'ak_[a-zA-Z0-9]{32}', sr.text)
-                if m:
-                    _CACHED_ARY_KEY = m.group(0)
-                    return _CACHED_ARY_KEY
-        except Exception as e:
-            logger.warning(f"Dynamic ARY API key resolution notice: {e}")
-            
-    return _CACHED_ARY_KEY or DEFAULT_ARY_API_KEY
+    return DEFAULT_ARY_API_KEY
 
 def is_ary_url(url: str) -> bool:
     if not url:
