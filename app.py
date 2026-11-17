@@ -510,7 +510,11 @@ def preview_ui():
 @app.route('/api/health')
 def health_check():
     """Sanitized public health endpoint for deployment probes and load balancers."""
-    return jsonify({'status': 'healthy'})
+    return jsonify({
+        'status': 'healthy',
+        'version': '2.1.0',
+        'build': 'ary-turbo-v2'
+    })
 
 @app.route('/api/debug_ytdlp')
 @login_required
@@ -568,6 +572,27 @@ def debug_ytdlp():
 
     result['logs'] = logs
     return jsonify(result)
+
+@app.route('/api/test_ary')
+def test_ary_diag():
+    from core.ary_extractor import extract_ary_stream, get_ary_api_key
+    url = request.args.get('url', 'https://aryplus.tv/video/v2/3/6afb09b94802cce952b563dd/6aabeb956ff05a2ba20dc641')
+    key = get_ary_api_key()
+    import requests
+    logs = []
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'x-api-key': key,
+        'Origin': 'https://aryplus.tv',
+        'Referer': 'https://aryplus.tv/'
+    }
+    for ep in ['https://be.aryplus.tv/api/cdn/ep/6afb09b94802cce952b563dd', 'https://be.aryplus.tv/api/cdn/6aabeb956ff05a2ba20dc641']:
+        try:
+            r = requests.get(ep, headers=headers, timeout=5)
+            logs.append({'endpoint': ep, 'status': r.status_code, 'len': len(r.text), 'sample': r.text[:200]})
+        except Exception as e:
+            logs.append({'endpoint': ep, 'error': str(e)})
+    return jsonify({'key': key, 'result': extract_ary_stream(url), 'logs': logs})
 
 @app.route('/api/download', methods=['POST'])
 def trigger_download():

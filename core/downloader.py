@@ -125,6 +125,47 @@ def download_task(task_id, url, format_type, quality, download_dir):
                             'speed': 'Connecting CDN...',
                             'eta': 'Starting stream'
                         })
+            else:
+                # Automatic YouTube High-Definition Fallback for ARY Dramas:
+                # If ARY CDN API is geoblocked or unavailable on cloud dyno,
+                # seamlessly fetch from ARY Digital Official YouTube Channel
+                search_q = None
+                hex_ids = re.findall(r'[0-9a-fA-F]{24}', url)
+                if stream_info and stream_info.get('title'):
+                    search_q = f"{stream_info['title']} ARY Digital"
+                elif hex_ids:
+                    try:
+                        import requests
+                        r = requests.get(
+                            f"https://be.aryplus.tv/api/cdn/ep/{hex_ids[0]}",
+                            headers={'x-api-key': get_ary_api_key(), 'Origin': 'https://aryplus.tv'},
+                            timeout=4
+                        )
+                        if r.status_code == 200:
+                            ep_d = r.json().get('episode') or {}
+                            if isinstance(ep_d, list) and ep_d: ep_d = ep_d[0]
+                            desc = ep_d.get('description') or ep_d.get('title')
+                            if desc: search_q = f"{desc} ARY Digital"
+                    except Exception:
+                        pass
+                
+                if search_q:
+                    with yt_dlp.YoutubeDL({'quiet': True, 'noplaylist': True}) as ydl_search:
+                        sr = ydl_search.extract_info(f"ytsearch1:{search_q}", download=False)
+                        if sr and sr.get('entries'):
+                            target_url = sr['entries'][0].get('webpage_url') or sr['entries'][0].get('url')
+                            ary_title = sr['entries'][0].get('title')
+                            ary_thumbnail = sr['entries'][0].get('thumbnail')
+                            with CACHE_LOCK:
+                                if task_id in PROGRESS_CACHE:
+                                    PROGRESS_CACHE[task_id].update({
+                                        'title': ary_title or "ARY Digital Video",
+                                        'thumbnail': ary_thumbnail,
+                                        'status': 'downloading',
+                                        'progress': 1,
+                                        'speed': 'Connecting YouTube CDN...',
+                                        'eta': 'Starting stream'
+                                    })
         except Exception as e:
             print("ARY Extractor fallback notice:", e)
 
@@ -277,7 +318,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
 
     js_type, js_path = get_js_runtime()
 
-    is_ary = is_ary_url(url) or is_ary_url(target_url)
+    is_ary = is_ary_url(target_url) or (is_ary_url(url) and not any(d in target_url for d in ['youtube.com', 'youtu.be']))
 
     ydl_opts = {
         'outtmpl': os.path.join(download_dir, f'{task_id}_%(title)s.%(ext)s'),
@@ -655,7 +696,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
             if 'drm' in err_msg_lower:
                 err_msg = 'This ARY stream is protected by DRM encryption.<br><span class="block mt-2 font-semibold text-white">👉 <strong>Solution:</strong> Paste the video link directly from <a href="https://www.youtube.com/@ARYDigitalasia" target="_blank" rel="noopener" class="underline text-yellow-400 hover:text-white font-black">ARY Digital Official YouTube Channel</a> to download in Full HD!</span>'
             elif any(k in err_msg_lower for k in ['expecting value', 'jsondecode', 'line 1 column 1', 'unsupported url', 'extractor']):
-                err_msg = 'Unable to extract stream from this ARY link. Please verify the episode URL from aryplus.tv.'
+                err_msg = 'Unable to extract stream from this ARY link. Please try again or paste the video link from <a href="https://www.youtube.com/@ARYDigitalasia" target="_blank" rel="noopener" class="underline text-yellow-400 hover:text-white font-bold">ARY Digital Official YouTube</a>.'
         elif any(k in err_msg_lower for k in ['expecting value', 'jsondecode', 'line 1 column 1']):
             err_msg = 'The video stream provider sent a temporary response. Please try again or paste another video URL.'
         elif any(k in err_msg_lower for k in ['sign in', 'confirm you', 'bot']):
