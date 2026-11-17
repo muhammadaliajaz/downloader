@@ -510,11 +510,7 @@ def preview_ui():
 @app.route('/api/health')
 def health_check():
     """Sanitized public health endpoint for deployment probes and load balancers."""
-    return jsonify({
-        'status': 'healthy',
-        'version': '2.1.0',
-        'build': 'ary-turbo-v2'
-    })
+    return jsonify({'status': 'healthy'})
 
 @app.route('/api/debug_ytdlp')
 @login_required

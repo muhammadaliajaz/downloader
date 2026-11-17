@@ -651,10 +651,10 @@ def download_task(task_id, url, format_type, quality, download_dir):
         err_msg = re.sub(r'/(?:[a-zA-Z0-9_\-\.]+/)+[a-zA-Z0-9_\-\.]+', '[Server Path]', err_msg)
         
         err_msg_lower = err_msg.lower()
-        if is_ary_url(url):
+        if is_ary_url(url) and target_url == url:
             if 'drm' in err_msg_lower:
                 err_msg = 'This ARY stream is protected by DRM encryption.'
-            elif any(k in err_msg_lower for k in ['expecting value', 'jsondecode', 'line 1 column 1', 'unsupported url', 'extractor']):
+            elif any(k in err_msg_lower for k in ['expecting value', 'jsondecode', 'line 1 column 1', 'unsupported url']):
                 err_msg = 'Unable to extract stream from this ARY link. Please verify the episode URL from aryplus.tv.'
         elif any(k in err_msg_lower for k in ['expecting value', 'jsondecode', 'line 1 column 1']):
             err_msg = 'The video stream provider sent a temporary response. Please try again or paste another video URL.'
