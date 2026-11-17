@@ -6,6 +6,9 @@ import re
 import time
 import tempfile
 import json
+import logging
+
+logger = logging.getLogger('downloader')
 
 from core.ary_extractor import extract_ary_stream, is_ary_url
 from core.tiktok_extractor import extract_tiktok_stream, is_tiktok_url, normalize_tiktok_url
@@ -320,6 +323,8 @@ def download_task(task_id, url, format_type, quality, download_dir):
         ydl_opts.pop('remote_components', None)
         ydl_opts.pop('js_runtimes', None)
         ydl_opts.pop('extractor_args', None)
+        ydl_opts.pop('postprocessor_args', None)
+        ydl_opts['fixup'] = 'never'
         ydl_opts['http_headers'] = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://aryplus.tv/',
@@ -329,12 +334,6 @@ def download_task(task_id, url, format_type, quality, download_dir):
         ydl_opts['concurrent_fragments'] = 16
         ydl_opts['buffersize'] = 1048576
         ydl_opts['hls_prefer_native'] = True
-        if ffmpeg_path:
-            ydl_opts['postprocessor_args'] = {
-                'ffmpeg': ['-c', 'copy', '-threads', '0']
-            }
-        else:
-            ydl_opts.pop('postprocessor_args', None)
     elif is_tiktok:
         ydl_opts.pop('http_chunk_size', None)
         ydl_opts['http_headers'] = {
@@ -438,7 +437,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
             }],
         })
     else:
-        if ffmpeg_path:
+        if ffmpeg_path and not is_ary:
             ydl_opts['merge_output_format'] = 'mp4'
         else:
             ydl_opts.pop('merge_output_format', None)
