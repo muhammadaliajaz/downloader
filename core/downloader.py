@@ -296,14 +296,14 @@ def download_task(task_id, url, format_type, quality, download_dir):
         'file_access_retries': 3,
         'extractor_retries': 3,
         'socket_timeout': 15,
-        'nocheckcertificate': True,
-        'postprocessor_args': {
-            'ffmpeg': ['-threads', '0', '-preset', 'ultrafast']
-        }
+        'nocheckcertificate': True
     }
 
     if ffmpeg_path:
         ydl_opts['ffmpeg_location'] = ffmpeg_path
+        ydl_opts['postprocessor_args'] = {
+            'ffmpeg': ['-threads', '0', '-preset', 'ultrafast']
+        }
 
     if js_type and js_path:
         ydl_opts['js_runtimes'] = {js_type: {'path': js_path}}
@@ -437,13 +437,21 @@ def download_task(task_id, url, format_type, quality, download_dir):
             ydl_opts['merge_output_format'] = 'mp4'
         else:
             ydl_opts.pop('merge_output_format', None)
-        if quality == 'best':
-            ydl_opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best/18/b'
-        elif quality.isdigit():
-            height = quality
-            ydl_opts['format'] = f'bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<={height}]+bestaudio/best[height<={height}][ext=mp4]/best[height<={height}]/best/18/b'
+        if is_ary:
+            if quality == 'best':
+                ydl_opts['format'] = 'best'
+            elif quality.isdigit():
+                ydl_opts['format'] = f'best[height<={quality}]/best'
+            else:
+                ydl_opts['format'] = 'best[height<=720]/best'
         else:
-            ydl_opts['format'] = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720][ext=mp4]/best[height<=720]/best/18/b'
+            if quality == 'best':
+                ydl_opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best/18/b'
+            elif quality.isdigit():
+                height = quality
+                ydl_opts['format'] = f'bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<={height}]+bestaudio/best[height<={height}][ext=mp4]/best[height<={height}]/best/18/b'
+            else:
+                ydl_opts['format'] = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720][ext=mp4]/best[height<=720]/best/18/b'
         
     try:
         # Store metadata as soon as we get it
