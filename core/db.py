@@ -24,9 +24,13 @@ def get_database_url():
     """Returns current active PostgreSQL / Supabase connection URL if set."""
     return os.environ.get('DATABASE_URL') or os.environ.get('SUPABASE_DB_URL')
 
+_PG_FAILED_UNTIL = 0
+
 def is_postgres_enabled():
     """Returns True if a valid PostgreSQL/Supabase DATABASE_URL is configured and not running isolated SQLite test."""
     if os.environ.get('CMS_DB_PATH'):
+        return False
+    if time.time() < _PG_FAILED_UNTIL:
         return False
     url = get_database_url()
     return bool(url and url.strip().startswith(('postgres://', 'postgresql://')))
@@ -109,7 +113,7 @@ def _parse_postgres_connection_params(url):
         'password': password,
         'dbname': dbname,
         'sslmode': 'require',
-        'connect_timeout': 15
+        'connect_timeout': 3
     }
 
 class CompatibleRow(dict):
@@ -298,7 +302,7 @@ _PG_POOL_LOCK = threading.Lock()
 
 def _get_pg_pool():
     """Initializes and returns a thread-safe persistent connection pool for Supabase."""
-    global _PG_POOL
+    global _PG_POOL, _PG_FAILED_UNTIL
     if _PG_POOL is None and is_postgres_enabled():
         with _PG_POOL_LOCK:
             if _PG_POOL is None:
@@ -309,6 +313,7 @@ def _get_pg_pool():
                 except Exception as e:
                     print(f"[DATABASE POOL NOTICE] Could not initialize ThreadedConnectionPool: {e}", flush=True)
                     _PG_POOL = None
+                    _PG_FAILED_UNTIL = time.time() + 60
     return _PG_POOL
 
 def get_db_connection():
@@ -317,6 +322,7 @@ def get_db_connection():
     - If DATABASE_URL is set -> Warm connection from ThreadedConnectionPool (0ms latency).
     - Otherwise -> Local SQLite connection with Row factory.
     """
+    global _PG_FAILED_UNTIL
     if is_postgres_enabled():
         pool = _get_pg_pool()
         if pool is not None:
@@ -331,20 +337,12 @@ def get_db_connection():
                     raw_conn = pool.getconn()
                 return PostgresConnectionWrapper(raw_conn, pool=pool)
             except Exception as e:
-                print(f"[DATABASE POOL NOTICE] getconn failed ({e}), trying direct connection.", flush=True)
-
-        # Fallback to direct connect if pool is full or unavailable
-        try:
-            import psycopg2
-            params = _parse_postgres_connection_params(get_database_url())
-            raw_conn = psycopg2.connect(**params)
-            return PostgresConnectionWrapper(raw_conn, pool=None)
-        except Exception as e:
-            print(f"[DATABASE NOTICE] PostgreSQL connection failed: {e}. Falling back to SQLite.", flush=True)
+                print(f"[DATABASE POOL NOTICE] getconn failed ({e}), falling back to SQLite.", flush=True)
+                _PG_FAILED_UNTIL = time.time() + 60
 
     # Local SQLite Fallback
     db_path = os.environ.get('CMS_DB_PATH') or DB_PATH
-    conn = sqlite3.connect(db_path, timeout=30.0, check_same_thread=False)
+    conn = sqlite3.connect(db_path, timeout=5.0, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.execute("PRAGMA journal_mode = WAL;")
