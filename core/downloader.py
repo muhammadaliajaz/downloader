@@ -650,14 +650,15 @@ def download_task(task_id, url, format_type, quality, download_dir):
         err_msg = re.sub(r'[A-Za-z]:\\[^\s<]+', '[Server Path]', err_msg)
         err_msg = re.sub(r'/(?:[a-zA-Z0-9_\-\.]+/)+[a-zA-Z0-9_\-\.]+', '[Server Path]', err_msg)
         
+        err_msg_lower = err_msg.lower()
         if is_ary_url(url):
-            if 'DRM' in err_msg:
+            if 'drm' in err_msg_lower:
                 err_msg = 'This ARY stream is protected by DRM encryption.<br><span class="block mt-2 font-semibold text-white">👉 <strong>Solution:</strong> Paste the video link directly from <a href="https://www.youtube.com/@ARYDigitalasia" target="_blank" rel="noopener" class="underline text-yellow-400 hover:text-white font-black">ARY Digital Official YouTube Channel</a> to download in Full HD!</span>'
-            elif 'Unsupported URL' in err_msg or 'extractor' in err_msg.lower():
+            elif any(k in err_msg_lower for k in ['expecting value', 'jsondecode', 'line 1 column 1', 'unsupported url', 'extractor']):
                 err_msg = 'Unable to extract stream from this ARY link. Please verify the episode URL from aryplus.tv.'
-        elif any(k in err_msg.lower() for k in ['expecting value', 'jsondecode', 'line 1 column 1']):
+        elif any(k in err_msg_lower for k in ['expecting value', 'jsondecode', 'line 1 column 1']):
             err_msg = 'The video stream provider sent a temporary response. Please try again or paste another video URL.'
-        elif any(k in err_msg.lower() for k in ['sign in', 'confirm you', 'bot']):
+        elif any(k in err_msg_lower for k in ['sign in', 'confirm you', 'bot']):
             err_msg = f'This video requires account verification or is restricted by the provider. ({err_msg[:200]})'
         with CACHE_LOCK:
             PROGRESS_CACHE[task_id] = {
