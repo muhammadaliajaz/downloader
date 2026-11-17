@@ -324,9 +324,12 @@ def download_task(task_id, url, format_type, quality, download_dir):
         ydl_opts['concurrent_fragments'] = 16
         ydl_opts['buffersize'] = 1048576
         ydl_opts['hls_prefer_native'] = True
-        ydl_opts['postprocessor_args'] = {
-            'ffmpeg': ['-c', 'copy', '-threads', '0']
-        }
+        if ffmpeg_path:
+            ydl_opts['postprocessor_args'] = {
+                'ffmpeg': ['-c', 'copy', '-threads', '0']
+            }
+        else:
+            ydl_opts.pop('postprocessor_args', None)
     elif is_tiktok:
         ydl_opts.pop('http_chunk_size', None)
         ydl_opts['http_headers'] = {
@@ -430,7 +433,10 @@ def download_task(task_id, url, format_type, quality, download_dir):
             }],
         })
     else:
-        ydl_opts['merge_output_format'] = 'mp4'
+        if ffmpeg_path:
+            ydl_opts['merge_output_format'] = 'mp4'
+        else:
+            ydl_opts.pop('merge_output_format', None)
         if quality == 'best':
             ydl_opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best/18/b'
         elif quality.isdigit():
@@ -612,7 +618,7 @@ def download_task(task_id, url, format_type, quality, download_dir):
             raise Exception("Target path traversal blocked.")
 
         # Security: Validate file extension against allowed media extensions
-        allowed_exts = ['.mp4', '.mp3', '.m4a', '.webm', '.mkv', '.avi', '.mov', '.flv']
+        allowed_exts = ['.mp4', '.mp3', '.m4a', '.webm', '.mkv', '.avi', '.mov', '.flv', '.ts']
         _, ext = os.path.splitext(final_filepath)
         if ext.lower() not in allowed_exts:
             if os.path.exists(final_filepath):
