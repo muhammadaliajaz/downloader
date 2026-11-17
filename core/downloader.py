@@ -105,28 +105,30 @@ def download_task(task_id, url, format_type, quality, download_dir):
     ary_thumbnail = None
     
     if is_ary_url(url):
-        try:
-            with CACHE_LOCK:
-                if task_id in PROGRESS_CACHE:
-                    PROGRESS_CACHE[task_id]['title'] = "Connecting to ARY Plus CDN..."
+        with CACHE_LOCK:
+            if task_id in PROGRESS_CACHE:
+                PROGRESS_CACHE[task_id]['title'] = "Connecting to ARY Plus CDN..."
+        
+        stream_info = extract_ary_stream(url)
+        if not stream_info or not stream_info.get('video_url'):
+            raise Exception("Unable to extract stream from this ARY link. Please verify the episode URL from aryplus.tv.")
+        
+        if stream_info.get('drm_enabled'):
+            raise Exception("This ARY stream is protected by DRM encryption.")
             
-            stream_info = extract_ary_stream(url)
-            if stream_info and stream_info.get('video_url'):
-                target_url = stream_info['video_url']
-                ary_title = stream_info.get('title')
-                ary_thumbnail = stream_info.get('thumbnail')
-                with CACHE_LOCK:
-                    if task_id in PROGRESS_CACHE:
-                        PROGRESS_CACHE[task_id].update({
-                            'title': ary_title or "ARY Plus Video",
-                            'thumbnail': ary_thumbnail,
-                            'status': 'downloading',
-                            'progress': 1,
-                            'speed': 'Connecting CDN...',
-                            'eta': 'Starting stream'
-                        })
-        except Exception as e:
-            print("ARY Extractor fallback notice:", e)
+        target_url = stream_info['video_url']
+        ary_title = stream_info.get('title')
+        ary_thumbnail = stream_info.get('thumbnail')
+        with CACHE_LOCK:
+            if task_id in PROGRESS_CACHE:
+                PROGRESS_CACHE[task_id].update({
+                    'title': ary_title or "ARY Plus Video",
+                    'thumbnail': ary_thumbnail,
+                    'status': 'downloading',
+                    'progress': 1,
+                    'speed': 'Connecting CDN...',
+                    'eta': 'Starting stream'
+                })
 
     # TikTok Direct Stream Extractor (Watermark-free, zero bot block)
     tiktok_title = None
@@ -665,13 +667,11 @@ def download_task(task_id, url, format_type, quality, download_dir):
         err_msg = re.sub(r'/(?:[a-zA-Z0-9_\-\.]+/)+[a-zA-Z0-9_\-\.]+', '[Server Path]', err_msg)
         
         err_msg_lower = err_msg.lower()
-        if is_ary_url(url) and target_url == url:
+        if is_ary_url(url):
             if 'drm' in err_msg_lower:
                 err_msg = 'This ARY stream is protected by DRM encryption.'
-            elif any(k in err_msg_lower for k in ['expecting value', 'jsondecode', 'line 1 column 1', 'unsupported url']):
+            elif any(k in err_msg_lower for k in ['unable to extract', 'no video stream']):
                 err_msg = 'Unable to extract stream from this ARY link. Please verify the episode URL from aryplus.tv.'
-        elif any(k in err_msg_lower for k in ['expecting value', 'jsondecode', 'line 1 column 1']):
-            err_msg = 'The video stream provider sent a temporary response. Please try again or paste another video URL.'
         elif any(k in err_msg_lower for k in ['sign in', 'confirm you', 'bot']):
             err_msg = f'This video requires account verification or is restricted by the provider. ({err_msg[:200]})'
         with CACHE_LOCK:

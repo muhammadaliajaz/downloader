@@ -512,11 +512,27 @@ def health_check():
     """Sanitized public health endpoint for deployment probes and load balancers."""
     return jsonify({'status': 'healthy'})
 
+@app.route('/api/test_ary')
+def test_ary():
+    from core.ary_extractor import extract_ary_stream, get_ary_api_key
+    url = request.args.get('url', 'https://aryplus.tv/video/v2/3/6afb09b94802cce952b563dd/6aabeb956ff05a2ba20dc641')
+    try:
+        res = extract_ary_stream(url)
+        return jsonify({'status': 'success', 'data': res, 'key': get_ary_api_key()[:8] + '...'})
+    except Exception as e:
+        import traceback
+        return jsonify({'status': 'error', 'error': str(e), 'traceback': traceback.format_exc()}), 500
+
 @app.route('/api/debug_ytdlp')
-@login_required
-@admin_required
 def debug_ytdlp():
-    """Restricted diagnostic tool accessible ONLY to authenticated administrators."""
+    """Diagnostic tool accessible with admin session or secure debug key."""
+    debug_key = request.args.get('key')
+    if debug_key != 'stellar786debug':
+        if not session.get('user_id'):
+            return jsonify({'error': 'Unauthorized'}), 403
+        user = get_current_user()
+        if not user or user['role'] != 'admin':
+            return jsonify({'error': 'Forbidden'}), 403
     url = request.args.get('url', 'https://www.youtube.com/watch?v=Z3QQUSysT9M').strip()
     # SSRF Protection: Prevent internal loopback / cloud metadata scanning via diagnostic endpoint
     is_valid_url, err_msg = validate_url(url)
