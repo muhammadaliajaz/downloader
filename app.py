@@ -235,6 +235,15 @@ def security_before_request():
     # Generate cryptographic per-request CSP nonce
     g.csp_nonce = secrets.token_hex(16)
 
+    # 0. Allow CORS Preflight immediately
+    if request.method == 'OPTIONS':
+        resp = Response()
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, HEAD, PUT, DELETE'
+        resp.headers['Access-Control-Allow-Headers'] = 'Range, Content-Type, Accept, X-CSRFToken'
+        resp.headers['Access-Control-Max-Age'] = '86400'
+        return resp
+
     # 1. Enforce HTTPS Redirection on production / public domains
     host = (request.headers.get('X-Forwarded-Host') or request.headers.get('Host') or '').split(':')[0].lower()
     is_public = host and not (host.startswith(('127.', '192.168.', '10.', '172.16.')) or host in ['localhost', 'testserver'])
@@ -251,11 +260,12 @@ def security_before_request():
     else:
         app.config['SESSION_COOKIE_SECURE'] = False
 
-    if host == 'aryplusdownloader.tech':
+    # Canonical redirect from apex to www for browser page navigation (do NOT redirect AJAX /api/ calls)
+    if host == 'aryplusdownloader.tech' and not request.path.startswith('/api/'):
         target_path = request.full_path if request.query_string else request.path
         return redirect(f"https://www.aryplusdownloader.tech{target_path}", code=301)
 
-    if (is_prod or is_public) and not is_https:
+    if (is_prod or is_public) and not is_https and not request.path.startswith('/api/'):
         https_url = request.url.replace('http://', 'https://', 1)
         return redirect(https_url, code=301)
 
@@ -311,13 +321,13 @@ def apply_security_headers(response):
     nonce = getattr(g, 'csp_nonce', '')
     nonce_script = f"'nonce-{nonce}' " if nonce else ""
     csp_directives = [
-        "default-src 'self'",
+        "default-src 'self' https://aryplusdownloader.tech https://www.aryplusdownloader.tech",
         f"script-src 'self' {nonce_script}https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://www.googletagmanager.com https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://adservice.google.com",
         "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://cdn.jsdelivr.net",
         "font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com data:",
         "img-src 'self' data: https: blob:",
         "media-src 'self' blob: https:",
-        "connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://*.google-analytics.com https://*.googletagmanager.com https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com",
+        "connect-src 'self' https://aryplusdownloader.tech https://www.aryplusdownloader.tech https://*.aryplusdownloader.tech https://www.google-analytics.com https://analytics.google.com https://*.google-analytics.com https://*.googletagmanager.com https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com",
         "frame-src 'self' https://googleads.g.doubleclick.net https://*.googlesyndication.com https://*.google.com",
         "object-src 'none'",
         "base-uri 'self'",
@@ -325,6 +335,12 @@ def apply_security_headers(response):
         "frame-ancestors 'none'"
     ]
     response.headers['Content-Security-Policy'] = "; ".join(csp_directives)
+
+    # Universal CORS for API endpoints
+    if request.path.startswith('/api/'):
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, HEAD'
+        response.headers['Access-Control-Allow-Headers'] = 'Range, Content-Type, Accept, X-CSRFToken'
 
     # HSTS: Strict-Transport-Security enforced on HTTPS, production environments, and public domains
     host = (request.headers.get('X-Forwarded-Host') or request.headers.get('Host') or '').split(':')[0].lower()
@@ -613,8 +629,14 @@ def debug_ytdlp():
     result['logs'] = logs
     return jsonify(result)
 
-@app.route('/api/download', methods=['POST'])
+@app.route('/api/download', methods=['POST', 'OPTIONS'])
 def trigger_download():
+    if request.method == 'OPTIONS':
+        resp = Response()
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        resp.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-CSRFToken, Accept'
+        return resp
     # 1. Rate Limiting Check (Max 10 requests / min per IP)
     client_ip = get_client_ip()
     allowed, retry_after = check_rate_limit(client_ip)
@@ -688,8 +710,14 @@ def trigger_download():
     resp.headers['X-Concurrency-Limit'] = '5'
     return resp
 
-@app.route('/api/status/<task_id>')
+@app.route('/api/status/<task_id>', methods=['GET', 'OPTIONS'])
 def status(task_id):
+    if request.method == 'OPTIONS':
+        resp = Response()
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        resp.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Accept'
+        return resp
     # Security: Strict UUID format validation
     try:
         uuid.UUID(task_id)
@@ -750,8 +778,14 @@ def status(task_id):
 
     return Response(event_stream(), mimetype="text/event-stream")
 
-@app.route('/api/cancel/<task_id>', methods=['POST'])
+@app.route('/api/cancel/<task_id>', methods=['POST', 'OPTIONS'])
 def cancel(task_id):
+    if request.method == 'OPTIONS':
+        resp = Response()
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        resp.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-CSRFToken, Accept'
+        return resp
     # Security: Strict UUID format validation
     try:
         uuid.UUID(task_id)
