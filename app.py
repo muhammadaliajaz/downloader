@@ -251,6 +251,10 @@ def security_before_request():
     else:
         app.config['SESSION_COOKIE_SECURE'] = False
 
+    if host == 'aryplusdownloader.tech':
+        target_path = request.full_path if request.query_string else request.path
+        return redirect(f"https://www.aryplusdownloader.tech{target_path}", code=301)
+
     if (is_prod or is_public) and not is_https:
         https_url = request.url.replace('http://', 'https://', 1)
         return redirect(https_url, code=301)
