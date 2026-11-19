@@ -129,9 +129,10 @@ def download_task(task_id, url, format_type, quality, download_dir):
                     'thumbnail': ary_thumbnail,
                     'status': 'downloading',
                     'progress': 1,
-                    'speed': 'Connecting CDN...',
-                    'eta': 'Starting stream'
+                    'speed': 'Connecting 32x CDN stream...',
+                    'eta': 'Starting download'
                 })
+                _save_task_cache(task_id, PROGRESS_CACHE[task_id])
 
     # TikTok Direct Stream Extractor (Watermark-free, zero bot block)
     tiktok_title = None
@@ -331,9 +332,12 @@ def download_task(task_id, url, format_type, quality, download_dir):
             'Origin': 'https://aryplus.tv'
         }
         ydl_opts['downloader'] = {'m3u8': 'native'}
-        ydl_opts['concurrent_fragments'] = 16
-        ydl_opts['buffersize'] = 1048576
+        ydl_opts['concurrent_fragments'] = 32
+        ydl_opts['buffersize'] = 2097152
         ydl_opts['hls_prefer_native'] = True
+        ydl_opts['retries'] = 10
+        ydl_opts['fragment_retries'] = 10
+        ydl_opts['skip_unavailable_fragments'] = True
     elif is_tiktok:
         ydl_opts.pop('http_chunk_size', None)
         ydl_opts['http_headers'] = {

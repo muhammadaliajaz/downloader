@@ -4,7 +4,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from core.security import is_safe_filepath
 
-def cleanup_job(download_dir, max_age_minutes=30):
+def cleanup_job(download_dir, max_age_minutes=120):
     now = time.time()
     if not os.path.exists(download_dir):
         return
