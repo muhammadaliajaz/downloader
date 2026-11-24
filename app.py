@@ -880,7 +880,7 @@ def download_file(task_id):
     resp.headers['Cache-Control'] = 'public, max-age=86400, no-transform'
     resp.headers['X-Content-Type-Options'] = 'nosniff'
     resp.headers['Connection'] = 'keep-alive'
-    resp.headers['Keep-Alive'] = 'timeout=65, max=1000'
+    resp.headers['Keep-Alive'] = 'timeout=75, max=1000'
     return resp
 
 if __name__ == '__main__':
